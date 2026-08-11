@@ -2,7 +2,7 @@ import asyncio
 from pydantic import SecretStr
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
-from ..tools import executor
+from src.tools.executor import executor
 
 AVAILABLE_MODELS = {
     "openai": ["gpt-5-pro", "gpt-4o", "gpt-3.5-turbo"],

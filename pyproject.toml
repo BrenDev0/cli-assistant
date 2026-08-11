@@ -3,7 +3,7 @@ name = "cli-assistant"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.4.2",
     "langchain-anthropic>=1.5.4",
