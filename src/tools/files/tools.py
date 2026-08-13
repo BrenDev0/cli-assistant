@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 PROJECT_ROOT = Path.cwd().resolve()
 
@@ -32,6 +33,7 @@ def create_file(file_path: str, content: str = "", overwrite: bool = False) -> s
     if path.exists() and not overwrite:
         raise FileExistsError(f"File already exits: {path}. Pass overwrite=True to replace it")
 
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     return str(path.resolve())
 
@@ -57,8 +59,37 @@ def update_file(file_path: str, old_string: str, new_string: str, replace_all: b
     return str(path.resolve())
 
 
+def delete_file(file_path: str) -> str:
+    print(f"deleting file... {file_path}")
+    path = _safe_path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"File does not exist: {path}")
+    if path.is_dir():
+        raise IsADirectoryError(f"'{path}' is a directory, not a file. Use delete_dir instead")
+
+    path.unlink()
+    return str(path)
 
 
-    
+def delete_dir(dir_path: str, recursive: bool = False) -> str:
+    print(f"deleting directory... {dir_path}")
+    path = _safe_path(dir_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Directory does not exist: {path}")
+    if not path.is_dir():
+        raise NotADirectoryError(f"'{path}' is not a directory. Use delete_file instead")
+    if path == PROJECT_ROOT:
+        raise ValueError("Refusing to delete the project root directory")
 
+    if recursive:
+        shutil.rmtree(path)
+    else:
+        try:
+            path.rmdir()
+        except OSError as e:
+            raise OSError(
+                f"Directory not empty: {path}. Pass recursive=True to delete it and its contents"
+            ) from e
+
+    return str(path)
 

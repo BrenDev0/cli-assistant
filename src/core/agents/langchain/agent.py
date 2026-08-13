@@ -3,13 +3,14 @@ from pydantic import SecretStr
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from src.tools.executor import executor
+from src.core.agents.types import Message
 
 AVAILABLE_MODELS = {
     "openai": ["gpt-5-pro", "gpt-4o", "gpt-3.5-turbo"],
     "anthropic": ["claude-opus-4-6", "claude-sonnet-5"]
 }
 
-class LangchainAssistant:
+class LangchainAgent:
     def __init__(
         self, 
         model: str, 
@@ -52,12 +53,17 @@ class LangchainAssistant:
             raise ValueError(f"Model {self._model} not available")
 
 
-    async def invoke(self, messages: list[tuple]):
+    async def invoke(self, messages: list[Message]) -> str:
+        tokens_used = 0
         for _ in range(10):
             result = await self.llm.ainvoke(messages)
+            usage = getattr(result, "usage_metadata", None) or {}
+            tokens_used += usage.get("total_tokens", 0)
             if not result.tool_calls:
                 content = result.content.strip() if result.content else ""
                 messages.append(("assistant", content))
+                print(f"Tokens used: {tokens_used}")
+                tokens_used = 0
                 return content
 
             messages.append(result)
@@ -66,9 +72,12 @@ class LangchainAssistant:
         raise RuntimeError("max iterations in invoke loop reached")
 
 
-    async def _append_tool_results(self, tool_calls: list[dict], messages: list[tuple]):
+    async def _append_tool_results(self, tool_calls: list[dict], messages: list[Message]) -> list[Message]:
         async def run_tool(tool_call: dict):
-            result = await executor(tool_name=tool_call["name"], params=tool_call["args"])
+            try:
+                result = await executor(tool_name=tool_call["name"], params=tool_call["args"])
+            except Exception as e:
+                result = f"Error running tool '{tool_call['name']}': {e}"
             return tool_call["id"], result
 
         tool_results = await asyncio.gather(*(run_tool(call) for call in tool_calls))

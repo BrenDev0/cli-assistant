@@ -1,32 +1,20 @@
-from src.agents.langchain.assistant import LangchainAssistant
-from src.tools.registry import SCHEMAS
-from src.tools.foundations.tools import list_foundations
+from src.core.agents.langchain.agent import LangchainAgent
+from src.assistants.orchestrator.config import MODEL, SCHEMAS, TEMPERATURE, API_KEY
+from src.assistants.orchestrator.prompt import SYSTEM_PROMPT
+from src.tools.skills.tools import list_skills
 import asyncio
-from .settings import settings
 import click
 
-SYSTEM_PROMPT = (
-    "You are a helpful assistant and will help the user with thier requests. "
-    "When asked to create, build, or update something concrete — a file, a folder, a "
-    "foundation — you must actually perform it using the available tools. Never just "
-    "describe or paste the content in your reply without also creating it via a tool call; "
-    "a request to 'create'/'build'/'make' something is not satisfied by showing it in chat. "
-    "Before each of your turns you will be shown the current list of available foundations "
-    "(reusable, previously-authored instructions for specific tasks) in a separate system "
-    "message. If one of them matches the user's request, read_file its FOUNDATION.md and "
-    "follow its instructions before acting."
-)
-
-# Index into `messages` that always holds the freshest foundations listing — refreshed every
+# Index into `messages` that always holds the freshest skills listing — refreshed every
 # turn (not appended) so it never goes stale and never grows the conversation unbounded.
-FOUNDATIONS_MESSAGE_INDEX = 1
+SKILLS_MESSAGE_INDEX = 1
 
 
 async def chat_loop():
-    llm = LangchainAssistant(
-        model="gpt-4o",
-        api_key=settings.OPENAI_API_KEY,
-        temperature=0.0,
+    llm = LangchainAgent(
+        model=MODEL,
+        api_key=API_KEY,
+        temperature=TEMPERATURE,
         tools=SCHEMAS
     )
 
@@ -51,8 +39,8 @@ async def chat_loop():
             click.echo("Good bye")
             break
 
-        messages[FOUNDATIONS_MESSAGE_INDEX] = (
-            "system", f"Available foundations:\n{list_foundations()}"
+        messages[SKILLS_MESSAGE_INDEX] = (
+            "system", f"Available skills:\n{list_skills()}"
         )
         messages.append(("user", user_input))
 

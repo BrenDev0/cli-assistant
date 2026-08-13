@@ -24,3 +24,12 @@ class UpdateFile(BaseModel):
 class SearchFile(BaseModel):
     """Search for a file by name"""
     file_name: str = Field(description="The name of the file that we need to search for")
+
+class DeleteFile(BaseModel):
+    """Delete an existing file"""
+    file_path: str = Field(description="The path of the file to delete")
+
+class DeleteDir(BaseModel):
+    """Delete an existing directory"""
+    dir_path: str = Field(description="The path of the directory to delete")
+    recursive: bool = Field(default=False, description="If true, delete the directory and all its contents; if false (default), the directory must be empty or an error is raised")
