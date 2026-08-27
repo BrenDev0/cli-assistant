@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     )
 
     OPENAI_API_KEY: str
+    GHL_PIT: str
+    GHL_LOCATION_ID: str
+    MCP_VERSION: str = "2025-06-18"
 
 
 
