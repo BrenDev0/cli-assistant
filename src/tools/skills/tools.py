@@ -35,11 +35,6 @@ def _parse_frontmatter(content: str) -> tuple[str | None, str | None]:
 
 
 async def build_skill(skill_name: str, description: str) -> str:
-    # Deferred import: registry.py imports this module at load time, and
-    # assistants.skill_builder ultimately imports agents.langchain.agent, which itself
-    # imports src.tools.executor -> src.tools.registry. Importing it here at module scope
-    # would loop back into registry.py while it's still mid-import. Deferring until this
-    # function actually runs (a real tool call, well after startup) avoids the cycle.
     from src.assistants.skill_builder.assistant import SkillBuilderAssistant
     from src.core.agents.langchain.agent import LangchainAgent
     from src.assistants.skill_builder.config import MODEL, SCHEMAS, TEMPERATURE, API_KEY

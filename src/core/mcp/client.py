@@ -26,41 +26,24 @@ class MCPClient:
 
     def __init__(
         self,
+        http: httpx.AsyncClient,
         url: str,
-        headers: dict[str, str],
         client_name: str = "cli-assistant",
         client_version: str = "0.1.0",
         protocol_version: str = LATEST_PROTOCOL_VERSION,
     ):
         self._url = url
-        # Accept goes last so a caller can't accidentally override it — this server
-        # 406s unless both media types are named explicitly.
-        self._headers = {
-            **headers,
-            "Accept": "application/json, text/event-stream",
-        }
+    
         self._client_name = client_name
         self._client_version = client_version
         self._proposed_version = protocol_version
 
-        self._http: httpx.AsyncClient | None = None
+        self._http=http
         self._tools: list[dict] | None = None
 
-        # Negotiated at initialize() — the version the *server* chose, which may
-        # be older than the one we proposed. Read this, never _proposed_version.
         self.protocol_version: str | None = None
         self.server_capabilities: dict = {}
         self.server_info: dict = {}
-
-    async def __aenter__(self):
-        self._http = httpx.AsyncClient(headers=self._headers, timeout=30.0)
-        await self.initialize()
-        return self
-
-    async def __aexit__(self, *exc):
-        if self._http:
-            await self._http.aclose()
-            self._http = None
 
 
     async def _rpc(self, method: str, params: dict) -> dict:
@@ -76,9 +59,6 @@ class MCPClient:
 
         response = await self._http.post(self._url, json=body)
 
-        # Parse before checking the status: servers routinely pair a non-2xx with a
-        # perfectly good JSON-RPC error body, and that message is far more useful
-        # than the status code. raise_for_status() is the fallback, not the gate.
         payload = _parse_sse(response.text)
 
         if payload is not None and "error" in payload:

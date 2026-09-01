@@ -4,10 +4,10 @@ from src.assistants.orchestrator.prompt import SYSTEM_PROMPT
 from src.tools.skills.tools import list_skills
 import asyncio
 import click
+from src.tools.ghl.tools import initialize_ghl_operations, catalog_text
+from src.tools.background.tools import drain_completed, _RUNNING
 
-# Index into `messages` that always holds the freshest skills listing — refreshed every
-# turn (not appended) so it never goes stale and never grows the conversation unbounded.
-SKILLS_MESSAGE_INDEX = 1
+SKILLS_MESSAGE_INDEX = 2
 
 
 async def chat_loop():
@@ -18,8 +18,11 @@ async def chat_loop():
         tools=SCHEMAS
     )
 
+    await initialize_ghl_operations()
+
     messages = [
         ("system", SYSTEM_PROMPT),
+        ("system", f"Available GoHighLevel operations:\n{catalog_text()}"),
         ("system", ""),  # placeholder, filled in each turn below
     ]
 
@@ -27,7 +30,10 @@ async def chat_loop():
 
     while True:
         try:
-            user_input = click.prompt("You", default="", show_default=False).strip()
+            user_input = (await asyncio.to_thread(
+                click.prompt, "You", default="", show_default=False
+            )).strip()
+            
         except (KeyboardInterrupt, EOFError):
             click.echo("\nGoodbye!")
             break
@@ -36,6 +42,8 @@ async def chat_loop():
             continue
 
         if user_input.lower() in ("exit", "quit"):
+            if _RUNNING:
+                click.echo(f"Warning: {len(_RUNNING)} background task(s) still running — abandoning them.")
             click.echo("Good bye")
             break
 
@@ -43,6 +51,14 @@ async def chat_loop():
             "system", f"Available skills:\n{list_skills()}"
         )
         messages.append(("user", user_input))
+
+    
+        if news := drain_completed():
+            messages.append(("system",
+            f"A background task finished. The result below is the worker's complete output. "
+            f"Relay it to the user as-is; do not extend, embellish, or substitute your own "
+            f"content. If the result does not contain the requested deliverable, say so plainly.\n{news}"
+        ))
 
         try:
             result = await llm.invoke(messages)
@@ -54,7 +70,12 @@ async def chat_loop():
 
 @click.command()
 def chat():
-    asyncio.run(chat_loop())
+    # Ctrl+C lands on the main thread, which is inside the event loop — not inside the
+    # coroutine's try/except, since click.prompt now runs in a worker thread.
+    try:
+        asyncio.run(chat_loop())
+    except KeyboardInterrupt:
+        click.echo("\nGoodbye!")
 
 
 if __name__ == "__main__":
