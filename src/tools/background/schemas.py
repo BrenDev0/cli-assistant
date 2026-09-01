@@ -10,12 +10,15 @@ class StartBackgroundTask(BaseModel):
     """
     description: str = Field(description="Short label for the task, shown to the user while it runs, for example 'Audit all contacts for missing email addresses'")
     instructions: str = Field(
-        description=(
-            "Complete, self-contained instructions for the background worker. The worker "
-            "starts with a fresh context and cannot see this conversation, so restate every "
-            "detail it needs: which records, which operations, and what to report back."
-        )
+    description=(
+        "Complete, self-contained instructions for the background worker. The worker "
+        "starts with a fresh context and cannot see this conversation, so restate "
+        "everything: the subject and scope, plus any constraint established earlier -- "
+        "the language to write in, tone, target audience, output format, length, and "
+        "which files or records to use. If the user has been writing in a language "
+        "other than English, state that language explicitly."
     )
+)
 
 
 class CheckBackgroundTask(BaseModel):

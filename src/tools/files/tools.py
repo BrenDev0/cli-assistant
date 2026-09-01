@@ -13,22 +13,18 @@ def _safe_path(user_path: str) -> Path:
 
 
 def read_file(file_path: str):
-    print(f"reading file... {file_path}")
     return _safe_path(file_path).read_text()
 
 def search_file(file_name: str, basse_dir: str = "."):
-    print(f"searching for file... {file_name} (in {basse_dir})")
     matches = _safe_path(basse_dir).rglob(f"*{file_name}*")
     return [str(match) for match in matches]
 
 def create_dir(dir_path: str):
-    print(f"creating directory... {dir_path}")
     _safe_path(dir_path).mkdir(parents=True, exist_ok=True)
     return str(Path(dir_path).resolve())
 
 
 def create_file(file_path: str, content: str = "", overwrite: bool = False) -> str:
-    print(f"creating file... {file_path}")
     path = _safe_path(file_path)
     if path.exists() and not overwrite:
         raise FileExistsError(f"File already exits: {path}. Pass overwrite=True to replace it")
@@ -39,7 +35,6 @@ def create_file(file_path: str, content: str = "", overwrite: bool = False) -> s
 
 
 def update_file(file_path: str, old_string: str, new_string: str, replace_all: bool = False) -> str:
-    print(f"updating file... {file_path}")
     path = _safe_path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"File does not exist: {path}")
@@ -60,7 +55,6 @@ def update_file(file_path: str, old_string: str, new_string: str, replace_all: b
 
 
 def delete_file(file_path: str) -> str:
-    print(f"deleting file... {file_path}")
     path = _safe_path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"File does not exist: {path}")
@@ -72,7 +66,6 @@ def delete_file(file_path: str) -> str:
 
 
 def delete_dir(dir_path: str, recursive: bool = False) -> str:
-    print(f"deleting directory... {dir_path}")
     path = _safe_path(dir_path)
     if not path.exists():
         raise FileNotFoundError(f"Directory does not exist: {path}")

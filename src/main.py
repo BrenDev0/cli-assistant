@@ -6,6 +6,10 @@ import asyncio
 import click
 from src.tools.ghl.tools import initialize_ghl_operations, catalog_text
 from src.tools.background.tools import drain_completed, _RUNNING
+from src.tools.ghl.tools import GHL
+from src.core import ui
+from prompt_toolkit import PromptSession
+from prompt_toolkit.patch_stdout import patch_stdout
 
 SKILLS_MESSAGE_INDEX = 2
 
@@ -26,16 +30,25 @@ async def chat_loop():
         ("system", ""),  # placeholder, filled in each turn below
     ]
 
-    click.echo("Assistant ready. Type 'exit', or 'quit' to stop\n")
+    ui.banner(len(SCHEMAS), len(GHL["catalog"]), MODEL)
+
+    # refresh_interval so the status bar ticks while you sit still; prompt_toolkit
+    # otherwise only redraws on keystrokes
+    session = PromptSession(
+        bottom_toolbar=ui.status_bar,
+        style=ui.STYLE,
+        refresh_interval=0.5,
+    )
 
     while True:
         try:
-            user_input = (await asyncio.to_thread(
-                click.prompt, "You", default="", show_default=False
-            )).strip()
-            
+            # patch_stdout() redirects writes from background tasks above the prompt line
+            # and redraws it, so a print landing mid-typing no longer eats your input.
+            with patch_stdout():
+                user_input = (await session.prompt_async(ui.prompt_message())).strip()
+
         except (KeyboardInterrupt, EOFError):
-            click.echo("\nGoodbye!")
+            ui.notice("goodbye")
             break
 
         if not user_input:
@@ -43,8 +56,8 @@ async def chat_loop():
 
         if user_input.lower() in ("exit", "quit"):
             if _RUNNING:
-                click.echo(f"Warning: {len(_RUNNING)} background task(s) still running — abandoning them.")
-            click.echo("Good bye")
+                ui.error(f"{len(_RUNNING)} background task(s) still running — abandoning them")
+            ui.notice("goodbye")
             break
 
         messages[SKILLS_MESSAGE_INDEX] = (
@@ -63,9 +76,9 @@ async def chat_loop():
         try:
             result = await llm.invoke(messages)
         except Exception as e:
-            click.echo(click.style(text=f"Error {e}", fg='red'))
+            ui.error(f"{type(e).__name__}: {e}")
             continue
-        click.echo(click.style(text=f"Assistant: {result}\n", italic=True, fg='cyan'))
+        ui.assistant(result)
 
 
 @click.command()
@@ -75,7 +88,7 @@ def chat():
     try:
         asyncio.run(chat_loop())
     except KeyboardInterrupt:
-        click.echo("\nGoodbye!")
+        ui.notice("goodbye")
 
 
 if __name__ == "__main__":
