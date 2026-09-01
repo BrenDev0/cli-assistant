@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-my_assistant = "src.main:chat"
+my_assistant = "src.cli.main:chat"
 
 [build-system]
 requires = ["hatchling"]

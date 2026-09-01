@@ -2,7 +2,8 @@ from uuid import uuid4
 import asyncio
 import re
 
-from src.core.events import CURRENT_TASK, clear_activity, set_activity
+from src.core import frontend
+from src.core.context import CURRENT_TASK
 
 TASKS: dict[str, dict] = {}
 _RUNNING: set[asyncio.Task] = set()
@@ -51,7 +52,7 @@ async def start_background_task(
 
         
 
-    set_activity(task_id, "starting")
+    frontend.task_started(task_id, description)
     task = asyncio.create_task(run())
     _RUNNING.add(task)
     task.add_done_callback(lambda t: _finish(task_id, t))
@@ -64,7 +65,7 @@ async def start_background_task(
 
 def _finish(task_id: str, t: asyncio.Task):
     _RUNNING.discard(t)
-    clear_activity(task_id)
+    frontend.task_finished(task_id)
     rec = TASKS[task_id]
     if t.cancelled():
         rec["status"] = "cancelled"

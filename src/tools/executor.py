@@ -1,8 +1,8 @@
 import inspect
 import asyncio
 
-from src.core import ui
-from src.core.events import CURRENT_TASK, emit_tool_error, emit_tool_start, format_call
+from src.core import frontend
+from src.core.context import CURRENT_TASK
 from .registry import (
     TOOL_REGISTRY,
     CreateDir,
@@ -33,12 +33,12 @@ async def executor(tool_name: str, params: dict):
         raise ValueError(f"tool {tool_name} not in registry")
 
     tool = TOOL_REGISTRY[tool_name]
-    emit_tool_start(tool_name, params)
+    frontend.tool_started(tool_name, params)
 
     # a background worker has nobody at the keyboard -- prompting there would hang the
     # task behind a question the user never sees
     if tool_name in REQUIRE_APPROVAL and not CURRENT_TASK.get():
-        decision = await ui.approve(format_call(tool_name, params))
+        decision = await frontend.approve(tool_name, params)
         if not decision.approved:
             return REDIRECTED.format(feedback=decision.feedback) if decision.feedback else DENIED
 
@@ -49,5 +49,5 @@ async def executor(tool_name: str, params: dict):
         return await asyncio.to_thread(tool, **params)
     except Exception as exc:
         # re-raised so _append_tool_results can hand the model the error to recover from
-        emit_tool_error(tool_name, exc)
+        frontend.tool_failed(tool_name, exc)
         raise

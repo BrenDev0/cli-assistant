@@ -4,7 +4,7 @@ from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from src.tools.executor import executor
 from src.core.agents.types import Message
-from src.core.events import emit_tokens
+from src.core import frontend
 
 AVAILABLE_MODELS = {
     "openai": ["gpt-5-pro", "gpt-4o", "gpt-3.5-turbo"],
@@ -63,7 +63,7 @@ class LangchainAgent:
             if not result.tool_calls:
                 content = result.content.strip() if result.content else ""
                 messages.append(("assistant", content))
-                emit_tokens(tokens_used)
+                frontend.tokens(tokens_used)
                 tokens_used = 0
                 return content
 

@@ -7,7 +7,9 @@ import click
 from src.tools.ghl.tools import initialize_ghl_operations, catalog_text
 from src.tools.background.tools import drain_completed, _RUNNING
 from src.tools.ghl.tools import GHL
-from src.core import ui
+from src.core import frontend
+from src.cli import ui
+from src.cli.frontend import CliFrontend
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
@@ -15,6 +17,9 @@ SKILLS_MESSAGE_INDEX = 2
 
 
 async def chat_loop():
+    cli = CliFrontend()
+    frontend.use(cli)
+
     llm = LangchainAgent(
         model=MODEL,
         api_key=API_KEY,
@@ -35,7 +40,7 @@ async def chat_loop():
     # refresh_interval so the status bar ticks while you sit still; prompt_toolkit
     # otherwise only redraws on keystrokes
     session = PromptSession(
-        bottom_toolbar=ui.status_bar,
+        bottom_toolbar=lambda: ui.status_bar(cli.activity),
         style=ui.STYLE,
         refresh_interval=0.5,
     )
