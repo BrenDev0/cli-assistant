@@ -21,9 +21,20 @@ class UpdateFile(BaseModel):
     new_string: str = Field(description="The text to replace old_string with")
     replace_all: bool = Field(default=False, description="If true, replace every occurrence of old_string; if false (default), old_string must be unique in the file")
 
+class ListDir(BaseModel):
+    """List the contents of a directory, showing sub-directories (with a trailing /) and
+    files with their sizes. Use this to see what is inside a folder before reading
+    anything -- read_file only works on files, never on directories."""
+    dir_path: str = Field(default=".", description="Directory to list, relative to the project root. Defaults to the project root itself")
+
 class SearchFile(BaseModel):
-    """Search for a file by name"""
-    file_name: str = Field(description="The name of the file that we need to search for")
+    """Find files and folders anywhere under base_dir. Every word of the query must appear
+    somewhere in the path, so 'progreso report' finds a report.md inside a folder named
+    after progreso. Folders come back with a trailing / -- list those with ListDir rather
+    than reading them. Build directories (.venv, node_modules, __pycache__, .git) are
+    skipped. Prefer two or three distinctive words over a full filename."""
+    file_name: str = Field(description="Words to look for in the path, for example 'progreso report' or 'schemas'")
+    base_dir: str = Field(default=".", description="Directory to search under, relative to the project root. Narrow this when you know roughly where to look")
 
 class DeleteFile(BaseModel):
     """Delete an existing file"""

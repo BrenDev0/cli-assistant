@@ -9,10 +9,13 @@ class Settings(BaseSettings):
         env_file=REPO_ROOT / ".env"
     )
 
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
     GHL_PIT: str
     GHL_LOCATION_ID: str
     MCP_VERSION: str = "2025-06-18"
+    # optional: a missing key fails on the first web call, not at startup
+    TAVILY_API_KEY: str = ""
 
 
 

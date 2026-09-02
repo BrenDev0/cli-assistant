@@ -1,4 +1,3 @@
-from src.core.settings import settings
 from src.tools.registry import SCHEMAS as all_tools
 
 # Workers must not spawn workers. Filtered into a new list rather than removed from
@@ -6,6 +5,7 @@ from src.tools.registry import SCHEMAS as all_tools
 EXCLUDED = {"StartBackgroundTask", "CheckBackgroundTask"}
 
 SCHEMAS = [schema for schema in all_tools if schema.__name__ not in EXCLUDED]
-API_KEY = settings.OPENAI_API_KEY
 MODEL = "gpt-4o"
 TEMPERATURE = 0.5
+
+MAX_ITERATIONS = 30

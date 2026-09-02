@@ -32,21 +32,18 @@ async def start_background_task(
     }
 
     async def run():
-        # set inside run(), not before create_task: the context is copied at creation,
-        # so setting it earlier would tag the orchestrator's calls too
+    
         CURRENT_TASK.set(task_id)
 
-        # imported here, not at module scope: registry.py imports this module, so a
-        # top-level import of anything that reads the registry would be circular
         from src.assistants.background_task.assistant import BackgroundTaskAssistant
-        from src.assistants.background_task.config import MODEL, SCHEMAS, TEMPERATURE, API_KEY
+        from src.assistants.background_task.config import MAX_ITERATIONS, MODEL, SCHEMAS, TEMPERATURE
         from src.core.agents.langchain.agent import LangchainAgent
 
         agent = LangchainAgent(
             model=MODEL,
             tools=SCHEMAS,
             temperature=TEMPERATURE,
-            api_key=API_KEY
+            max_iterations=MAX_ITERATIONS
         )
         return await BackgroundTaskAssistant(agent=agent).work(task_folder, instructions)
 
@@ -65,16 +62,26 @@ async def start_background_task(
 
 def _finish(task_id: str, t: asyncio.Task):
     _RUNNING.discard(t)
-    frontend.task_finished(task_id)
     rec = TASKS[task_id]
+
     if t.cancelled():
         rec["status"] = "cancelled"
     elif t.exception():
         rec["status"] = "failed"
         rec["result"] = f"{type(t.exception()).__name__}: {t.exception()}"
     else:
-        rec["status"] = "done"
-        rec["result"] = t.result()
+        from src.assistants.background_task.assistant import FAILURE_MARKER
+
+        result = t.result()
+        rec["result"] = result
+      
+        rec["status"] = "failed" if str(result).startswith(FAILURE_MARKER) else "done" 
+
+ 
+    detail = str(rec["result"] or "").strip().splitlines()
+    frontend.task_finished(
+        task_id, rec["description"], rec["status"], detail[0][:120] if detail else ""
+    )
 
 
 

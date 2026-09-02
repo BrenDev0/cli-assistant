@@ -29,7 +29,7 @@ def banner(tool_count: int, operation_count: int, model: str) -> None:
         f"{tool_count} tools {DOT} {operation_count} GHL operations {DOT} {model}",
         fg="bright_black",
     ))
-    click.echo("  " + click.style("type 'exit' or 'quit' to leave", fg="bright_black"))
+    click.echo("  " + click.style("/help for commands · 'exit' to leave", fg="bright_black"))
     click.echo()
 
 

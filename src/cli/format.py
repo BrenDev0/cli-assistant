@@ -13,6 +13,7 @@ def _supports_unicode() -> bool:
 
 UNICODE = _supports_unicode()
 CALL, FAIL, INFO = ("▸", "✗", "·") if UNICODE else (">", "x", ".")
+OK = "✓" if UNICODE else "+"
 PROMPT, REPLY, RULE = ("❯", "◆", "─") if UNICODE else (">", "*", "-")
 DOT = "·" if UNICODE else "|"
 

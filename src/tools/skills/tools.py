@@ -1,10 +1,10 @@
 from pathlib import Path
 
-PROJECT_ROOT = Path.cwd().resolve()
+from src.core.workspace import skills_dir as _skills_dir
 
 
 def list_skills() -> str:
-    skills_dir = PROJECT_ROOT / ".my_assistant" / "skills"
+    skills_dir = _skills_dir()
     if not skills_dir.exists():
         return "No skills found."
 
@@ -37,11 +37,10 @@ def _parse_frontmatter(content: str) -> tuple[str | None, str | None]:
 async def build_skill(skill_name: str, description: str) -> str:
     from src.assistants.skill_builder.assistant import SkillBuilderAssistant
     from src.core.agents.langchain.agent import LangchainAgent
-    from src.assistants.skill_builder.config import MODEL, SCHEMAS, TEMPERATURE, API_KEY
+    from src.assistants.skill_builder.config import MODEL, SCHEMAS, TEMPERATURE
     agent = LangchainAgent(
         model=MODEL,
         tools=SCHEMAS,
-        temperature=TEMPERATURE,
-        api_key=API_KEY
+        temperature=TEMPERATURE
     )
     return await SkillBuilderAssistant(agent=agent).build(skill_name, description)

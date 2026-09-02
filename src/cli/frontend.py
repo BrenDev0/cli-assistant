@@ -9,7 +9,7 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from src.core.frontend import Decision
 
 from . import ui
-from .format import CALL, FAIL, INFO, fmt_value, format_call
+from .format import CALL, FAIL, INFO, OK, fmt_value, format_call
 
 TASK_COLORS = ("magenta", "cyan", "green", "yellow", "blue", "bright_magenta")
 
@@ -69,8 +69,15 @@ class CliFrontend:
     def task_started(self, task_id: str, description: str) -> None:
         self.activity[task_id] = "starting"
 
-    def task_finished(self, task_id: str) -> None:
+    def task_finished(self, task_id: str, description: str, status: str, detail: str) -> None:
         self.activity.pop(task_id, None)
+
+        glyph, colour = (OK, "green") if status == "done" else (FAIL, "red")
+        body = click.style(description, bold=True)
+        if detail:
+            body += click.style(f" — {detail}", fg="bright_black")
+
+        self._line(glyph, colour, body, task_id)
 
     async def approve(self, name: str, params: dict) -> Decision:
         if self._session is None:

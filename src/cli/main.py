@@ -1,19 +1,34 @@
 from src.core.agents.langchain.agent import LangchainAgent
-from src.assistants.orchestrator.config import MODEL, SCHEMAS, TEMPERATURE, API_KEY
+from src.assistants.orchestrator.config import MODEL, SCHEMAS, TEMPERATURE
 from src.assistants.orchestrator.prompt import SYSTEM_PROMPT
 from src.tools.skills.tools import list_skills
 import asyncio
+from datetime import datetime
 import click
 from src.tools.ghl.tools import initialize_ghl_operations, catalog_text
 from src.tools.background.tools import drain_completed, _RUNNING
 from src.tools.ghl.tools import GHL
+from src.tools.web.tools import initialize_web_client
+from src.tools.history.tools import record, start_session
 from src.core import frontend
-from src.cli import ui
+from src.cli import commands, ui
 from src.cli.frontend import CliFrontend
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
-SKILLS_MESSAGE_INDEX = 2
+# Holds everything that changes turn to turn — the clock and the skills listing.
+# Kept after the static system prompt and GHL catalog so those stay a cacheable prefix,
+# and rewritten rather than appended so it never goes stale or grows the conversation.
+CONTEXT_MESSAGE_INDEX = 2
+
+
+def context_message() -> str:
+    now = datetime.now().astimezone()
+    return (
+        f"Current date and time: {now:%A, %Y-%m-%d %H:%M} {now.tzname()} (UTC{now:%z}). "
+        f"Treat this as the present moment when interpreting relative dates.\n\n"
+        f"Available skills:\n{list_skills()}"
+    )
 
 
 async def chat_loop():
@@ -22,12 +37,16 @@ async def chat_loop():
 
     llm = LangchainAgent(
         model=MODEL,
-        api_key=API_KEY,
         temperature=TEMPERATURE,
         tools=SCHEMAS
     )
 
     await initialize_ghl_operations()
+
+    try:
+        initialize_web_client()
+    except RuntimeError as exc:
+        ui.error(f"web tools unavailable — {exc}")
 
     messages = [
         ("system", SYSTEM_PROMPT),
@@ -35,10 +54,11 @@ async def chat_loop():
         ("system", ""),  # placeholder, filled in each turn below
     ]
 
+    start_session()
+
     ui.banner(len(SCHEMAS), len(GHL["catalog"]), MODEL)
 
-    # refresh_interval so the status bar ticks while you sit still; prompt_toolkit
-    # otherwise only redraws on keystrokes
+   
     session = PromptSession(
         bottom_toolbar=lambda: ui.status_bar(cli.activity),
         style=ui.STYLE,
@@ -47,8 +67,7 @@ async def chat_loop():
 
     while True:
         try:
-            # patch_stdout() redirects writes from background tasks above the prompt line
-            # and redraws it, so a print landing mid-typing no longer eats your input.
+           
             with patch_stdout():
                 user_input = (await session.prompt_async(ui.prompt_message())).strip()
 
@@ -65,10 +84,13 @@ async def chat_loop():
             ui.notice("goodbye")
             break
 
-        messages[SKILLS_MESSAGE_INDEX] = (
-            "system", f"Available skills:\n{list_skills()}"
-        )
+        if user_input.startswith("/"):
+            messages, llm = await commands.handle(user_input, messages, llm)
+            continue
+
+        messages[CONTEXT_MESSAGE_INDEX] = ("system", context_message())
         messages.append(("user", user_input))
+        record("user", user_input)
 
     
         if news := drain_completed():
@@ -78,18 +100,21 @@ async def chat_loop():
             f"content. If the result does not contain the requested deliverable, say so plainly.\n{news}"
         ))
 
+        messages = commands.trim_history(messages)
+
         try:
             result = await llm.invoke(messages)
         except Exception as e:
             ui.error(f"{type(e).__name__}: {e}")
             continue
+
+        record("assistant", result)
         ui.assistant(result)
 
 
 @click.command()
 def chat():
-    # Ctrl+C lands on the main thread, which is inside the event loop — not inside the
-    # coroutine's try/except, since click.prompt now runs in a worker thread.
+
     try:
         asyncio.run(chat_loop())
     except KeyboardInterrupt:
