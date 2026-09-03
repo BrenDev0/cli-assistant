@@ -30,19 +30,33 @@ REDIRECTED = (
 )
 
 
+# Approval is a conversation with a person, so it happens one at a time even though the
+# work around it is concurrent. A model can ask for three deletions in one message and
+# _append_tool_results gathers them, so without this every tool announces itself the
+# instant it starts: you get "starting delete A", the question about A, then "starting
+# delete B" and "starting delete C" printed on top of it, and your answer to A lands
+# underneath questions it was never about. Holding the lock across the announcement AND
+# the question keeps each one whole.
+_APPROVAL = asyncio.Lock()
+
+
 async def executor(tool_name: str, params: dict):
     if tool_name not in TOOL_REGISTRY.keys():
         raise ValueError(f"tool {tool_name} not in registry")
 
     tool = TOOL_REGISTRY[tool_name]
-    frontend.tool_started(tool_name, params)
 
     # a background worker has nobody at the keyboard -- prompting there would hang the
     # task behind a question the user never sees
     if tool_name in REQUIRE_APPROVAL and not CURRENT_TASK.get():
-        decision = await frontend.approve(tool_name, params)
+        async with _APPROVAL:
+            frontend.tool_started(tool_name, params)
+            decision = await frontend.approve(tool_name, params)
+
         if not decision.approved:
             return REDIRECTED.format(feedback=decision.feedback) if decision.feedback else DENIED
+    else:
+        frontend.tool_started(tool_name, params)
 
     try:
         if inspect.iscoroutinefunction(tool):
