@@ -188,6 +188,74 @@ def update_file(file_path: str, old_string: str, new_string: str, replace_all: b
     return _shown(path)
 
 
+def _transfer_target(source: Path, destination: str, overwrite: bool) -> Path:
+    """The real destination path, with the conventions people expect from cp/mv: a file
+    named against an existing directory lands inside it rather than replacing it."""
+    target = _safe_path(destination)
+
+    if target.is_dir() and source.is_file():
+        target = target / source.name
+
+    if target.exists() and not overwrite:
+        raise FileExistsError(
+            f"'{_shown(target)}' already exists. Pass overwrite=True to replace it."
+        )
+
+    if source.is_dir() and target.is_relative_to(source):
+        raise ValueError(
+            f"Cannot copy or move '{_shown(source)}' into itself ('{_shown(target)}')."
+        )
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+def _clear(target: Path) -> None:
+    if not target.exists():
+        return
+    shutil.rmtree(target) if target.is_dir() else target.unlink()
+
+
+def copy_path(source: str, destination: str, overwrite: bool = False) -> str:
+    """Copy bytes on disk rather than re-creating a file from remembered content -- the
+    contents never pass through the model, so they cannot come out altered."""
+    src = _safe_path(source)
+    if not src.exists():
+        raise FileNotFoundError(f"Nothing to copy at: {source}")
+
+    target = _transfer_target(src, destination, overwrite)
+    _clear(target)
+
+    if src.is_dir():
+        shutil.copytree(src, target)
+        count = sum(1 for p in target.rglob("*") if p.is_file())
+        return f"Copied {count} file(s) from {_shown(src)}/ to {_shown(target)}/"
+
+    shutil.copy2(src, target)
+    return f"Copied {_shown(src)} to {_shown(target)} ({target.stat().st_size:,} bytes)"
+
+
+def move_path(source: str, destination: str, overwrite: bool = False) -> str:
+    src = _safe_path(source)
+    if not src.exists():
+        raise FileNotFoundError(f"Nothing to move at: {source}")
+    if src == project_root() or src == assistant_home():
+        raise ValueError(f"Refusing to move the root directory '{_shown(src)}'")
+
+    target = _transfer_target(src, destination, overwrite)
+    _clear(target)
+
+    shown_source = _shown(src)
+    # str() because shutil.move takes the string form of a Path on every version
+    shutil.move(str(src), str(target))
+
+    if target.is_dir():
+        count = sum(1 for p in target.rglob("*") if p.is_file())
+        return f"Moved {count} file(s) from {shown_source}/ to {_shown(target)}/"
+
+    return f"Moved {shown_source} to {_shown(target)} ({target.stat().st_size:,} bytes)"
+
+
 def delete_file(file_path: str) -> str:
     path = _safe_path(file_path)
     if not path.exists():

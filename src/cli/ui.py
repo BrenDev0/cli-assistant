@@ -21,12 +21,12 @@ def line(text: str) -> None:
         click.echo(text)
 
 
-def banner(tool_count: int, operation_count: int, model: str) -> None:
+def banner(tool_count: int, ghl_tool_count: int, model: str) -> None:
     click.echo()
     click.echo("  " + click.style("my_assistant", fg=ACCENT, bold=True))
     click.echo("  " + click.style(RULE * 46, fg="bright_black"))
     click.echo("  " + click.style(
-        f"{tool_count} tools {DOT} {operation_count} GHL operations {DOT} {model}",
+        f"{tool_count} tools {DOT} {ghl_tool_count} GHL {DOT} {model}",
         fg="bright_black",
     ))
     click.echo("  " + click.style("/help for commands · 'exit' to leave", fg="bright_black"))

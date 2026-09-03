@@ -21,6 +21,21 @@ from prompt_toolkit.patch_stdout import patch_stdout
 # and rewritten rather than appended so it never goes stale or grows the conversation.
 CONTEXT_MESSAGE_INDEX = 2
 
+# Injected on the turn a task finishes, then immediately downgraded to TASK_RELAYED. Both
+# forms carry the same verified output; only the first one asks for it to be reported.
+TASK_NOTICE = (
+    "A background task finished while the user was typing. The result below is the "
+    "worker's complete, disk-verified output. Report it in THIS reply and nowhere else: "
+    "do not extend, embellish, or substitute your own content, and if the result does not "
+    "contain the requested deliverable, say so plainly.\n{news}"
+)
+
+TASK_RELAYED = (
+    "[already reported to the user — do not announce this again] A background task "
+    "finished earlier and its result was passed on. Kept only so you can refer back to "
+    "the file paths in it:\n{news}"
+)
+
 
 def context_message() -> str:
     now = datetime.now().astimezone()
@@ -50,13 +65,13 @@ async def chat_loop():
 
     messages = [
         ("system", SYSTEM_PROMPT),
-        ("system", f"Available GoHighLevel operations:\n{catalog_text()}"),
+        ("system", f"How to use GoHighLevel:\n{catalog_text()}"),
         ("system", ""),  # placeholder, filled in each turn below
     ]
 
     start_session()
 
-    ui.banner(len(SCHEMAS), len(GHL["catalog"]), MODEL)
+    ui.banner(len(SCHEMAS), len(GHL["mcp_tools"]), MODEL)
 
    
     session = PromptSession(
@@ -92,21 +107,28 @@ async def chat_loop():
         messages.append(("user", user_input))
         record("user", user_input)
 
-    
-        if news := drain_completed():
-            messages.append(("system",
-            f"A background task finished. The result below is the worker's complete output. "
-            f"Relay it to the user as-is; do not extend, embellish, or substitute your own "
-            f"content. If the result does not contain the requested deliverable, say so plainly.\n{news}"
-        ))
+        news = drain_completed()
+        if news:
+            messages.append(("system", TASK_NOTICE.format(news=news)))
 
         messages = commands.trim_history(messages)
+
+        # The notice is the last message going in, and invoke() only ever appends after
+        # it, so this index still points at it once the turn is over.
+        notice_index = len(messages) - 1 if news else None
 
         try:
             result = await llm.invoke(messages)
         except Exception as e:
             ui.error(f"{type(e).__name__}: {e}")
+            # left as a live notice: the turn that was meant to relay it never ran
             continue
+
+        # Spent. Left as-is it is a standing order to relay, read again on every later
+        # turn -- which is why a finished task gets announced a second and third time
+        # while the user is already talking about something else.
+        if notice_index is not None:
+            messages[notice_index] = ("system", TASK_RELAYED.format(news=news))
 
         record("assistant", result)
         ui.assistant(result)

@@ -36,6 +36,33 @@ class SearchFile(BaseModel):
     file_name: str = Field(description="Words to look for in the path, for example 'progreso report' or 'schemas'")
     base_dir: str = Field(default=".", description="Directory to search under, relative to the project root. Narrow this when you know roughly where to look")
 
+class CopyPath(BaseModel):
+    """Copy a file or a whole directory to another location, leaving the original in
+    place. Use this to put a copy of something where the user wants it -- NEVER read a
+    file and re-create it at the new path. Re-creating round-trips the contents through
+    your context, where they can be truncated or replaced with something you did not
+    read; copying moves the bytes on disk and cannot corrupt them."""
+    source: str = Field(description="The existing file or directory to copy from")
+    destination: str = Field(
+        description="Where to copy to. If source is a file and destination is an existing "
+        "directory, the file is copied into it under the same name. Parent directories "
+        "are created as needed."
+    )
+    overwrite: bool = Field(default=False, description="If true, replace anything already at the destination; if false (default) an error is raised")
+
+class MovePath(BaseModel):
+    """Move or rename a file or a whole directory. The original no longer exists at the
+    old path afterwards. Use this rather than reading a file and re-creating it elsewhere,
+    which risks writing content you never actually read. If the user may still want the
+    original where it is, use CopyPath instead."""
+    source: str = Field(description="The existing file or directory to move")
+    destination: str = Field(
+        description="The new path. If source is a file and destination is an existing "
+        "directory, the file is moved into it under the same name. Parent directories "
+        "are created as needed."
+    )
+    overwrite: bool = Field(default=False, description="If true, replace anything already at the destination; if false (default) an error is raised")
+
 class DeleteFile(BaseModel):
     """Delete an existing file"""
     file_path: str = Field(description="The path of the file to delete")

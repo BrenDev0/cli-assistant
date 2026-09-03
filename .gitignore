@@ -1,5 +1,6 @@
 uv.lock
 .env
+dev.py
 # Python-generated files
 __pycache__/
 *.py[oc]

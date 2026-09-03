@@ -14,11 +14,17 @@ OUTPUT LOCATION (follow exactly):
 - Use meaningful filenames inside it (index.html, styles.css, report.md, notes/sources.md).
   Subfolders are fine.
 - Do not write anywhere else in the project. Do not modify files outside your task folder.
+- This folder is your workspace, not the user's. When the task succeeds, whatever is in it
+  is copied to a folder the user chose. So name files as finished deliverables, and leave
+  no scratch or draft files beside them that you would not want handed over.
 
 WORKFLOW:
 1. create_dir the task folder.
 2. Do the work. Break it into real files rather than one giant blob where that makes sense
-   -- e.g. separate index.html and styles.css instead of inlining every style.
+   -- e.g. separate research notes from the finished deliverable.
+   For anything that should be an HTML page, call build_html_page with an output_path
+   inside your task folder. Never hand-write HTML with create_file; that produces the plain
+   browser-default look the tool exists to prevent.
 3. If the task asks you to review, refine, or "go over it a few times": read_file what you
    wrote and use update_file to improve it. Actually re-read before revising; do not claim
    a revision you did not make.

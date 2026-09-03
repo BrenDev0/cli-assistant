@@ -7,27 +7,56 @@ from src.core.agents.types import Message
 from src.core import frontend
 from src.core.settings import settings
 
+# Every model here must support tool calling through bind_tools -- this agent is a
+# tool-calling loop and a model that cannot call tools cannot do anything in it. That rules
+# out the base completion models (babbage-002, davinci-002, gpt-3.5-turbo-instruct), the
+# search-preview variants, and the -pro tiers, which are served over the Responses API
+# rather than the chat completions path ChatOpenAI uses here.
+# Dated snapshots (gpt-5.4-2026-03-05 and friends) are deliberately left out; the bare
+# alias tracks them, and pinning belongs in config, not in the menu.
 PROVIDERS = {
+    # newest tier -- three same-version variants, characteristics unverified here
+    "gpt-5.6-luna": "openai",
+    "gpt-5.6-sol": "openai",
+    "gpt-5.6-terra": "openai",
     "gpt-5.5": "openai",
     "gpt-5.4": "openai",
     "gpt-5.4-mini": "openai",
+    "gpt-5.4-nano": "openai",
+    "gpt-5.3-chat-latest": "openai",
+    "gpt-5.2": "openai",
+    "gpt-5.2-chat-latest": "openai",
+    "gpt-5.1": "openai",
+    "gpt-5.1-chat-latest": "openai",
     "gpt-5": "openai",
+    "gpt-5-chat-latest": "openai",
     "gpt-5-mini": "openai",
+    "gpt-5-nano": "openai",
     "gpt-4.1": "openai",
     "gpt-4.1-mini": "openai",
+    "gpt-4.1-nano": "openai",
     "gpt-4o": "openai",
     "gpt-4o-mini": "openai",
-    "o3": "openai",
     "o4-mini": "openai",
+    "o3": "openai",
+    "o3-mini": "openai",
+    "o1": "openai",
     "claude-opus-5": "anthropic",
     "claude-sonnet-5": "anthropic",
     "claude-haiku-4-5-20251001": "anthropic",
 }
 
-# These reject any temperature but their default -- verified per model, since it does not
-# follow the family: gpt-5.4 accepts one, gpt-5 does not. Passing it is a 400, so the
-# parameter is omitted entirely for these.
-FIXED_TEMPERATURE = {"gpt-5.5", "gpt-5", "gpt-5-mini", "o3", "o4-mini"}
+
+ACCEPTS_TEMPERATURE = {
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4.1-nano",
+    "claude-opus-5",
+    "claude-sonnet-5",
+    "claude-haiku-4-5-20251001",
+}
 
 CLIENTS = {"openai": ChatOpenAI, "anthropic": ChatAnthropic}
 
@@ -75,7 +104,7 @@ class LangchainAgent:
         client = CLIENTS[provider_for(self._model)]
 
         kwargs = {"model_name": self._model, "api_key": self._api_key}
-        if self._model not in FIXED_TEMPERATURE:
+        if self._model in ACCEPTS_TEMPERATURE:
             kwargs["temperature"] = self._temperature
 
         llm = client(**kwargs)

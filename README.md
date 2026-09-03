@@ -7,9 +7,9 @@ without relying on a pre-built agent framework.
 ## Overview
 
 CLI Assistant runs a conversational agent loop directly in the terminal. It
-maintains conversation state across turns, exposes 19 tools the model can call
-(file system, GoHighLevel CRM, web search, background tasks, conversation
-history), and executes those calls through an async runtime.
+maintains conversation state across turns, exposes 23 tools the model can call
+(file system, GoHighLevel CRM, web search, HTML authoring, background tasks,
+conversation history), and executes those calls through an async runtime.
 
 Two features shape most of the design:
 
@@ -96,6 +96,10 @@ GHL_LOCATION_ID=...
     to `~/.my_assistant/tasks/<slug>-<id>/`.
   - **Skill Builder** — file tools only, authors `SKILL.md` under
     `~/.my_assistant/skills/<name>/`.
+  - **HTML Builder** — authors one self-contained, designed HTML page. Runs two
+    passes over the same assistant: an art-direction pass with no write tools
+    that commits to typefaces, hex values and layout in a written brief, then a
+    build pass that executes it and revises itself once.
 - **CLI** (`src/cli`) — prompt_toolkit chat loop, command dispatcher, styled
   output, and the status bar showing live background-task activity.
 
@@ -103,10 +107,11 @@ GHL_LOCATION_ID=...
 
 | group | tools |
 |---|---|
-| files | read, list, search, create file/dir, update, delete file/dir |
+| files | read, list, search, create file/dir, update, copy, move, delete file/dir |
 | GoHighLevel | describe and execute any of 36 CRM operations over MCP |
 | web | search, extract, map, crawl (Tavily) |
-| background | start task, check task |
+| html | build page (report, landing, dashboard, article) |
+| background | start task, check task, deliver task output |
 | skills | build, list |
 | history | search past conversations |
 
@@ -115,8 +120,22 @@ GHL_LOCATION_ID=...
 - **Framework-light by intent** — LangChain wraps chat model providers only;
   the agent loop, tool dispatch, and multi-agent delegation are hand-rolled.
 - **Provider-agnostic models** — the API key is derived from the model name, so
-  switching models can never send the wrong provider's credentials. 14 models
-  across OpenAI and Anthropic, switchable at runtime with `/model`.
+  switching models can never send the wrong provider's credentials. 28 models
+  across OpenAI and Anthropic, switchable at runtime with `/model`. Only models
+  that support tool calling are listed: a model that cannot call tools can do
+  nothing in a tool-calling loop, so offering it in the menu is a trap.
+- **Temperature support is an allowlist, not a blocklist** — reasoning tiers
+  reject the parameter outright and return a 400, while a model that accepts one
+  and is not given one simply uses its default. The failure is asymmetric, so
+  only models verified to take a temperature are sent one, and anything added
+  later is safe by default rather than broken by default.
+- **Model strength is assigned per assistant, by supervision and blast radius** —
+  the background worker gets the strongest, because it is the only agent that
+  runs with nobody at the keyboard (approval is skipped when `CURRENT_TASK` is
+  set), runs the deepest loop, and writes the file the client opens. The
+  orchestrator sits a tier below: its mistakes surface in the next line of chat.
+  The skill builder is cheapest — writing a `SKILL.md` to a spelled-out layout is
+  not a reasoning problem.
 - **Reports are verified, not trusted** — a background worker's claim that it
   wrote a file is checked against the filesystem before being relayed, and the
   orchestrator is told to relay results rather than embellish them. A model
@@ -131,8 +150,33 @@ GHL_LOCATION_ID=...
 - **Global workspace, local projects** — skills and history live in
   `~/.my_assistant/` so they follow the user, while deliverables stay in the
   project. Skills built in one directory used to be invisible in every other.
+- **A task's workspace is not its delivery address** — a worker still does all
+  its work in `~/.my_assistant/tasks/<slug>/`, which keeps drafts out of the
+  project, but that folder is unreachable for anyone who does not already know
+  it exists. So `StartBackgroundTask` takes a `deliver_to` folder, asked of the
+  user before the task starts, and the runtime copies the finished files there
+  on success — copies, so the task folder survives as the record of what was
+  produced. `DeliverTask` does the same after the fact, by task id.
+- **Bytes move on disk, never through the model** — `copy_path`, `move_path`
+  and `deliver_task` exist so that "put this file over there" is a filesystem
+  operation. Without them the only way to move a file is to read it and
+  re-create it, which round-trips the contents through a context window that can
+  truncate them, summarise them, or substitute something that was never read.
+  A directory listing is not file content, and a model with no move tool will
+  eventually write one as if it were.
 - **Self-extending skills** — skills are plain instruction files one agent
   writes and another later reads, rather than code.
+- **Design is a decision, not a decoration pass** — "make it styled" constrains
+  nothing, so a model styles a page one tag at a time and every implicit choice
+  falls back to the median of its training data: Arial, black on white, a
+  stacked column of full-width text. The HTML builder blocks that from two
+  sides. A house design system in `src/assistants/html_builder/design.py` states
+  exact tokens and names the defaults it bans, and an art-direction pass has to
+  commit to typefaces, hex values and a layout in writing before any markup
+  exists. Styling stays inside that assistant rather than becoming a design
+  agent it calls: design and markup are one artifact, and a separate agent would
+  be writing CSS for a DOM it cannot see. `.my_assistant/design/brand.md`
+  overrides the house system per user.
 
 ## Frameworks & tools
 

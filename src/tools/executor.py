@@ -5,16 +5,18 @@ from src.core import frontend
 from src.core.context import CURRENT_TASK
 from .registry import (
     TOOL_REGISTRY,
-    CreateDir,
     UpdateFile,
-    CreateFile,
+    MovePath,
     DeleteFile,
     DeleteDir,
 )
 
+# Creating something new is cheap to undo and gets no prompt. Changing or removing
+# something that already exists does. MovePath is on this side of the line because it
+# unlinks the source; CopyPath only ever adds, so it is not gated.
 REQUIRE_APPROVAL = {
     cls.__name__
-    for cls in (CreateDir, CreateFile, UpdateFile, DeleteFile, DeleteDir)
+    for cls in (UpdateFile, MovePath, DeleteFile, DeleteDir)
 }
 
 DENIED = (
