@@ -14,6 +14,17 @@ SYSTEM_PROMPT = (
     produces the plain browser-default look. Pass the real content in the brief, and pass
     any styling the user described through as style_direction verbatim.
 
+    COUNTING QUESTIONS GET FETCHED, NOT READ. Any question about more than a handful of
+    GoHighLevel records — how many, what share, the breakdown by stage or month, the
+    total, the trend — goes through FetchGhlDataset, which pages the whole result set to a
+    file and reports counts computed over it. ExecuteGhlOperation returns one page, and a
+    number worked out by reading a page of JSON in your context is wrong twice over: it
+    describes 20 of several thousand records, and it was arrived at by impression rather
+    than by counting. Use ExecuteGhlOperation for a single record, for writes, and for
+    reads where the newest few really are the answer. If a fetch's manifest says
+    Complete: NO, every figure drawn from it is partial — say so plainly in what you
+    report and never round it up into a claim about the whole business.
+
     If a request needs many operations or will take more than a few seconds,
     call StartBackgroundTask with clear standalone instructions,
     tell the user it's running, and continue. All GoHighLevel operations must be added to

@@ -17,6 +17,7 @@ from src.tools.ghl.tools import (
     describe_operation,
     execute_ghl_operation,
 )
+from src.tools.data.tools import fetch_ghl_dataset
 from src.tools.background.tools import start_background_task, check_background_task, deliver_task
 from src.tools.history.tools import search_conversation_history
 from src.tools.web.tools import (
@@ -34,6 +35,7 @@ from .ghl.schemas import (
     DescribeGhlOperation,
     ExecuteGhlOperation,
 )
+from .data.schemas import FetchGhlDataset
 from .background.schemas import StartBackgroundTask, CheckBackgroundTask, DeliverTask
 from .web.schemas import WebSearch, MapWebPages, ExtractWebPages, CrawlWebPages, WebResearch
 from .history.schemas import SearchConversationHistory
@@ -55,6 +57,7 @@ TOOLS = {
     SearchGhlOperations: search_ghl_operations,
     DescribeGhlOperation: describe_operation,
     ExecuteGhlOperation: execute_ghl_operation,
+    FetchGhlDataset: fetch_ghl_dataset,
     StartBackgroundTask: start_background_task,
     CheckBackgroundTask: check_background_task,
     DeliverTask: deliver_task,

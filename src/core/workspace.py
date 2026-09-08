@@ -27,6 +27,13 @@ def tasks_dir() -> Path:
     return ASSISTANT_HOME / "tasks"
 
 
+def data_dir() -> Path:
+    """Fetched datasets. Global rather than project-local because a dataset is a snapshot
+    of the user's CRM, not of the project they happened to be sitting in when they pulled
+    it -- the same 1,800 contacts should not be re-fetched once per folder."""
+    return ASSISTANT_HOME / "data"
+
+
 def project_root() -> Path:
     return _project_root
 

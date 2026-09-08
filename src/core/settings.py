@@ -11,11 +11,19 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
-    GHL_PIT: str
-    GHL_LOCATION_ID: str
+    # Optional, like TAVILY_API_KEY below: a missing pair disables the CRM tools and says
+    # so at startup rather than raising a pydantic ValidationError before main() runs. As
+    # required fields these made a first install impossible for anyone who did not already
+    # have a GoHighLevel token -- the app died at import, so there was no prompt to read
+    # the error in and nothing to run the setup against.
+    GHL_PIT: str = ""
+    GHL_LOCATION_ID: str = ""
     MCP_VERSION: str = "2025-06-18"
     # optional: a missing key fails on the first web call, not at startup
     TAVILY_API_KEY: str = ""
+
+    def has_ghl(self) -> bool:
+        return bool(self.GHL_PIT and self.GHL_LOCATION_ID)
 
 
 

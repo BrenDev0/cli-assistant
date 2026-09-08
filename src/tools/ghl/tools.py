@@ -32,6 +32,26 @@ that area, not necessarily that the operation does not exist. Say so plainly."""
 
 
 async def initialize_ghl_operations():
+    """Open the MCP connection, or say plainly that it cannot be opened.
+
+    The server accepts `initialize` without checking the token, so a missing or wrong one
+    is not caught here -- it surfaces as a 401 on the first real operation. Checking for
+    the keys up front is what turns "the token is not authorized for this scope" on some
+    later turn into an answerable startup message.
+    """
+    if not settings.has_ghl():
+        missing = [
+            name for name, value in (
+                ("GHL_PIT", settings.GHL_PIT),
+                ("GHL_LOCATION_ID", settings.GHL_LOCATION_ID),
+            ) if not value
+        ]
+        raise RuntimeError(
+            f"{' and '.join(missing)} "
+            f"{'is' if len(missing) == 1 else 'are'} not set -- add "
+            f"{'it' if len(missing) == 1 else 'them'} to your .env to use the "
+            f"GoHighLevel tools."
+        )
 
     client = MCPClient(
         http=AsyncClient(

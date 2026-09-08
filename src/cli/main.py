@@ -56,7 +56,12 @@ async def chat_loop():
         tools=SCHEMAS
     )
 
-    await initialize_ghl_operations()
+    # Both optional integrations fail the same way: a warning at startup, the rest of the
+    # assistant still usable. A missing key is a first-run state, not a broken install.
+    try:
+        await initialize_ghl_operations()
+    except Exception as exc:
+        ui.error(f"GoHighLevel tools unavailable — {exc}")
 
     try:
         initialize_web_client()
@@ -71,7 +76,7 @@ async def chat_loop():
 
     start_session()
 
-    ui.banner(len(SCHEMAS), len(GHL["mcp_tools"]), MODEL)
+    ui.banner(len(SCHEMAS), len(GHL["mcp_tools"] or ()), MODEL)
 
    
     session = PromptSession(

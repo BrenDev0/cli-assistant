@@ -7,9 +7,10 @@ without relying on a pre-built agent framework.
 ## Overview
 
 CLI Assistant runs a conversational agent loop directly in the terminal. It
-maintains conversation state across turns, exposes 23 tools the model can call
-(file system, GoHighLevel CRM, web search, HTML authoring, background tasks,
-conversation history), and executes those calls through an async runtime.
+maintains conversation state across turns, exposes 25 tools the model can call
+(file system, GoHighLevel CRM, dataset fetching, web search, HTML authoring,
+background tasks, conversation history), and executes those calls through an async
+runtime.
 
 Two features shape most of the design:
 
@@ -24,11 +25,73 @@ Two features shape most of the design:
 ## Install
 
 ```bash
+git clone <this repo> && cd cli-assistant
+uv sync                     # create .venv and install dependencies
 uv tool install -e .        # `my_assistant` on PATH, tracks your edits
 uv tool update-shell        # once, if the command isn't found
 ```
 
-Then run `my_assistant` from any directory.
+Create a `.env` **in the cloned repo directory** with at least one model key:
+
+```
+OPENAI_API_KEY=...
+```
+
+The `.env` is always read from the clone (`settings.py` resolves it from the
+package location), never from the directory you launch in. That matters because
+`my_assistant` is meant to be run from whatever project you are working on — the
+launch directory is the project, but the configuration stays with the code.
+
+Then run `my_assistant` from any directory. Everything except the model key is
+optional: missing integrations print one line at startup and disable their own
+tools, so a first run works with nothing but `OPENAI_API_KEY`.
+
+### Connecting GoHighLevel
+
+The CRM tools need a private integration token and the sub-account id:
+
+```
+GHL_PIT=pit-...             # GoHighLevel private integration token
+GHL_LOCATION_ID=...         # the sub-account (location) to work in
+```
+
+In GoHighLevel, the token comes from the sub-account's **Settings → Private
+Integrations → Create new integration**; it is shown once, so copy it then. The
+location id is in **Settings → Business Profile**, and also sits in the URL of
+any sub-account page (`/location/<GHL_LOCATION_ID>/...`).
+
+Grant the read scopes for the data you intend to analyse — the token's scopes are
+the real limit on what the assistant can see, and a missing one surfaces as a
+`401` naming the operation it refused:
+
+```
+contacts.readonly  conversations.readonly  opportunities.readonly
+calendars.readonly  users.readonly  locations/customFields.readonly
+```
+
+`opportunities.readonly` is the one worth checking. Most CRM analysis — pipeline
+value, conversion rates, velocity by stage — is unanswerable without it, and its
+absence is invisible until something asks for it.
+
+### First run
+
+```
+$ my_assistant
+
+  my_assistant
+  ──────────────────────────────────────────────
+  25 tools · 4 GHL · gpt-5.1
+  /help for commands · 'exit' to leave
+
+> how many contacts do I have, and how many have an email address?
+```
+
+Ask questions about the CRM in plain language. Anything touching GoHighLevel is
+delegated to a background task, so the answer arrives a little later and the
+prompt stays usable meanwhile — you will be asked which folder finished files
+should land in. Counting questions pull the whole result set to
+`~/.my_assistant/data/` first; the reply states the row count it is based on, and
+says so explicitly when a fetch came back partial.
 
 ## Where things live
 
@@ -39,6 +102,7 @@ Two roots, deliberately separated:
     skills/               built once, available everywhere
     history/              every conversation, searchable across projects
     tasks/                background task output and records
+    data/                 fetched CRM datasets, one folder per pull
 
 <launch directory>/       the active project — your own files
 ```
@@ -50,14 +114,15 @@ those two roots and reject anything that would escape either.
 The launch directory is the project for now; explicit project selection is the
 next step.
 
-`.env` keys — only `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` is required:
+Full `.env` reference — only one model key is required, and every other line
+disables a group of tools by its absence rather than breaking the app:
 
 ```
-OPENAI_API_KEY=...
+OPENAI_API_KEY=...         # required unless ANTHROPIC_API_KEY is set
 ANTHROPIC_API_KEY=...      # optional, needed for claude-* models
 TAVILY_API_KEY=...         # optional, needed for the web tools
 GHL_PIT=...                # optional, GoHighLevel private integration token
-GHL_LOCATION_ID=...
+GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
 ```
 
 ## Commands
@@ -108,7 +173,8 @@ GHL_LOCATION_ID=...
 | group | tools |
 |---|---|
 | files | read, list, search, create file/dir, update, copy, move, delete file/dir |
-| GoHighLevel | describe and execute any of 36 CRM operations over MCP |
+| GoHighLevel | search, describe and execute any CRM operation over MCP |
+| data | fetch a paged CRM read to disk and profile it |
 | web | search, extract, map, crawl (Tavily) |
 | html | build page (report, landing, dashboard, article) |
 | background | start task, check task, deliver task output |
@@ -166,6 +232,38 @@ GHL_LOCATION_ID=...
   eventually write one as if it were.
 - **Self-extending skills** — skills are plain instruction files one agent
   writes and another later reads, rather than code.
+- **Numbers are counted, not read** — `ExecuteGhlOperation` returns one page, so
+  answering "how many contacts converted last month" from it is wrong twice
+  over: it describes 20 of several thousand records, and the arithmetic happens
+  by impression inside a context window. `FetchGhlDataset` pages the whole
+  result set to `.my_assistant/data/<name>-<date>/rows.ndjson` and returns a
+  *manifest* — row count against the total GHL itself reported, per-field null
+  rates and value ranges, and the path. The rows never enter anyone's context,
+  which is the same argument as `copy_path`: data a model retypes is data it can
+  quietly alter. The profile deliberately stops at shape and computes no
+  summary statistics, because a sum produced here would arrive with nothing to
+  check it against.
+- **A partial fetch says so** — GHL reports a `total` on its search endpoints,
+  so completeness is checkable rather than assumed: the manifest states
+  `Complete: NO` with the reason whenever the row count falls short, and with no
+  total to compare against a fetch is called partial rather than whole. Silent
+  truncation is the failure that matters here, because 600 rows reported as a
+  full quarter looks exactly like the real thing.
+- **Pagination is per-operation, and it lives in one file** — GHL does not
+  paginate one way. `search-contacts-advanced` takes `pageLimit` in a POST body
+  and expects the *last row's own* `searchAfter` array echoed back;
+  `search-conversation` takes `limit` in the query string and a `startAfterDate`
+  cursor the rows carry under `sort`; others offer only a page number. So the
+  cursor is a property of the rows, not of the response envelope. Each shape is
+  a `Paging` record in `src/tools/data/paging.py` detected from the operation's
+  own contract, and an unrecognised shape returns `None` rather than a guess — a
+  wrong parameter name is silently ignored by GHL and comes back looking like a
+  complete one-page dataset.
+- **The fetcher is read-only by construction** — it checks the server's own
+  `kind` classification and refuses anything that is not a read. It loops without
+  approval and runs unsupervised inside background tasks, so it must not be
+  reachable as a bulk write path, and "fetch" in a tool name has never stopped a
+  model from passing it a delete.
 - **Design is a decision, not a decoration pass** — "make it styled" constrains
   nothing, so a model styles a page one tag at a time and every implicit choice
   falls back to the median of its training data: Arial, black on white, a
