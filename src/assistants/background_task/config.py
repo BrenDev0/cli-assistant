@@ -18,4 +18,4 @@ MODEL = "gpt-5.5"
 # Inert on a gpt-5 tier; see ACCEPTS_TEMPERATURE in the agent.
 TEMPERATURE = 0.5
 
-MAX_ITERATIONS = 30
+MAX_ITERATIONS = 50
