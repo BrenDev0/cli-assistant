@@ -42,11 +42,18 @@ class Paging:
     """
 
     kind: str
-    size_param: str | None = None
+    # Alternative names for the page-size parameter, in preference order. GHL is not
+    # consistent even within one paging style: `search-contacts-advanced` calls it
+    # `pageLimit` and rejects `limit`, while `search-opportunities-advanced` -- same
+    # searchAfter cursor, same POST body -- calls it `limit`. Whichever the contract
+    # declares is the one sent.
+    size_params: tuple[str, ...] = ()
     size_in: str = "query"
     cursor_in: str = "query"
-    # (row field -> request parameter). Read off the LAST row of a page.
-    cursor_map: tuple[tuple[str, str], ...] = ()
+    # (alternative row fields, request parameter). Read off the LAST row of a page, taking
+    # the first field the rows actually carry. Contacts publish their cursor as
+    # `searchAfter`; opportunities publish the identical [epoch, id] pair as `sort`.
+    cursor_map: tuple[tuple[tuple[str, ...], str], ...] = ()
     # the row field is a one-element array whose contents are the cursor (`sort`: [epoch])
     unwrap_single: bool = False
     page_param: str | None = None
@@ -55,23 +62,23 @@ class Paging:
     def describe(self) -> str:
         if self.page_param:
             return f"{self.kind} (increments '{self.page_param}')"
-        pairs = ", ".join(f"row.{src} -> {dst}" for src, dst in self.cursor_map)
+        pairs = ", ".join(f"row.{'|'.join(src)} -> {dst}" for src, dst in self.cursor_map)
         return f"{self.kind} ({pairs})"
 
 
 SEARCH_AFTER = Paging(
     kind="searchAfter",
-    size_param="pageLimit",
+    size_params=("pageLimit", "limit"),
     size_in="body",
     cursor_in="body",
-    cursor_map=(("searchAfter", "searchAfter"),),
+    cursor_map=((("searchAfter", "sort"), "searchAfter"),),
     verified=True,
 )
 
 START_AFTER_DATE = Paging(
     kind="startAfterDate",
-    size_param="limit",
-    cursor_map=(("sort", "startAfterDate"),),
+    size_params=("limit",),
+    cursor_map=((("sort",), "startAfterDate"),),
     unwrap_single=True,
     verified=True,
 )
@@ -84,11 +91,11 @@ START_AFTER_DATE = Paging(
 # announces itself, never a silent one.
 START_AFTER_ID = Paging(
     kind="startAfter",
-    size_param="limit",
-    cursor_map=(("dateAdded", "startAfter"), ("id", "startAfterId")),
+    size_params=("limit",),
+    cursor_map=((("dateAdded",), "startAfter"), (("id",), "startAfterId")),
 )
 
-PAGE_NUMBER = Paging(kind="page", size_param="limit", page_param="page")
+PAGE_NUMBER = Paging(kind="page", size_params=("limit",), page_param="page")
 
 STRATEGIES = {
     p.kind: p for p in (SEARCH_AFTER, START_AFTER_DATE, START_AFTER_ID, PAGE_NUMBER)
@@ -132,17 +139,18 @@ def detect(operation: dict) -> Paging | None:
 
 
 def size_param_for(operation: dict, paging: Paging) -> tuple[str, str] | None:
-    """(parameter, group) to put the page size in, or None if the operation has no such
-    parameter and the server's own default has to stand."""
-    if not paging.size_param:
-        return None
-
+    """(parameter, group) to put the page size in, or None if the operation declares none
+    of the alternatives and the server's own default has to stand."""
     if paging.size_in == "body":
         names = {f.get("name") for f in operation.get("requestBodyFields", [])}
     else:
         names = set(operation.get("parameterNames") or [])
 
-    return (paging.size_param, paging.size_in) if paging.size_param in names else None
+    for candidate in paging.size_params:
+        if candidate in names:
+            return candidate, paging.size_in
+
+    return None
 
 
 def normalize(params: dict, has_body: bool) -> dict:
@@ -206,10 +214,16 @@ def total_from(data) -> int | None:
 
 
 def cursor_from(row: dict, paging: Paging) -> dict | None:
-    """The next page's cursor parameters, taken off the last row of this page."""
+    """The next page's cursor parameters, taken off the last row of this page.
+
+    Each parameter names several row fields it may live under, tried in order -- the same
+    cursor is published as `searchAfter` by one endpoint and `sort` by another.
+    """
     cursor = {}
-    for row_field, param in paging.cursor_map:
-        value = row.get(row_field)
+    for row_fields, param in paging.cursor_map:
+        value = next(
+            (row[field] for field in row_fields if row.get(field) is not None), None
+        )
         if value is None:
             return None
         if paging.unwrap_single and isinstance(value, list):

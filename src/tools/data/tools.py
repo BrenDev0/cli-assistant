@@ -33,6 +33,12 @@ def _slug(text: str, limit: int = 40) -> str:
     return cleaned[:limit].rstrip("-") or "dataset"
 
 
+def _today() -> str:
+    """The date stamp every dataset folder carries. Local time, matching the user's sense
+    of "today" rather than UTC's -- the manifest records an exact UTC fetched_at anyway."""
+    return datetime.now().strftime("%Y%m%d")
+
+
 async def fetch_ghl_dataset(
     name: str,
     operation_id: str,
@@ -49,11 +55,11 @@ async def fetch_ghl_dataset(
     them exactly, instead of in a context window where they have to be counted by
     impression.
     """
-    folder = data_dir() / f"{_slug(name)}-{datetime.now().strftime('%Y%m%d')}"
+    folder = data_dir() / f"{_slug(name)}-{_today()}"
     manifest_path = folder / MANIFEST_FILE
     request = {"operation_id": operation_id, "params": params or {}, "fields": fields}
 
-    cached = _cached(manifest_path, request, refresh)
+    cached = _cached(folder, request, refresh)
     if cached:
         return cached
 
@@ -210,7 +216,9 @@ async def _fetch(
             if not strategy.page_param:
                 cursor = pg.cursor_from(rows[-1], strategy)
                 if cursor is None:
-                    carried = ", ".join(src for src, _ in strategy.cursor_map)
+                    carried = ", ".join(
+                        " or ".join(fields) for fields, _ in strategy.cursor_map
+                    )
                     stopped = (
                         f"the last row carried no cursor -- '{strategy.kind}' paging "
                         f"reads it from row field(s) '{carried}', which this operation's "
@@ -290,31 +298,46 @@ def _project(row: dict, fields: list[str] | None) -> dict:
     return {key: row.get(key) for key in fields}
 
 
-def _cached(manifest_path: Path, request: dict, refresh: bool) -> str | None:
-    """A same-day manifest for the same request, or nothing.
+def _cached(folder: Path, request: dict, refresh: bool) -> str | None:
+    """Today's dataset for this exact request, under any name.
 
-    Keyed on the request, not just the name: two different questions asked under one
-    dataset name must not serve each other's rows. A mismatch re-fetches rather than
-    erroring, since the caller's intent is clearly the newer request.
+    Matched on the request (operation, params, fields) rather than on the dataset name,
+    because the name is the caller's label and the request is what determines the rows.
+    Keying on the name meant a re-ask under any new label missed and re-pulled identical
+    data: one session produced eight duplicate "-refreshed" folders that way, ~6,600
+    tokens of manifests for rows already on disk. A different request under a name already
+    in use still re-fetches -- two questions must never serve each other's rows.
     """
-    if refresh or not manifest_path.is_file():
+    if refresh:
         return None
 
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
+    for candidate in sorted(data_dir().glob(f"*-{_today()}/{MANIFEST_FILE}")):
+        try:
+            manifest = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
 
-    same = all(manifest.get(key) == value for key, value in request.items())
-    if not same or not (manifest_path.parent / ROWS_FILE).is_file():
-        return None
+        if not all(manifest.get(key) == value for key, value in request.items()):
+            continue
+        if not (candidate.parent / ROWS_FILE).is_file():
+            continue
 
-    return (
-        f"{_report(manifest)}\n\n"
-        f"This was already fetched today and came from the cache, so no API calls were "
-        f"made and nothing changed in GHL since is reflected. Pass refresh=True to pull "
-        f"it again."
-    )
+        note = (
+            f"Fetched {manifest['fetched_at']} and read from disk just now -- no API "
+            f"calls were made. This IS the current data for that request; do not re-fetch "
+            f"it under another name to get something fresher, which only writes a second "
+            f"copy of the same rows. If the CRM has genuinely changed since and you need "
+            f"it re-pulled, call this again with the SAME name and refresh=True."
+        )
+        if candidate.parent != folder:
+            note += (
+                f"\nIt was fetched under the name '{manifest['name']}', so the rows are at "
+                f"the path above rather than under the name you passed."
+            )
+
+        return f"{_report(manifest)}\n\n{note}"
+
+    return None
 
 
 def _report(manifest: dict) -> str:

@@ -152,11 +152,27 @@ def _finish(entry: dict, total: int) -> dict:
     if not values:
         return result
 
-    if entry["distinct_overflow"]:
-        result["distinct"] = f">={MAX_DISTINCT}"
-        result["examples"] = list(values)[:EXAMPLES]
-    else:
-        result["distinct"] = len(values)
+    result["distinct"] = (
+        f">={MAX_DISTINCT}" if entry["distinct_overflow"] else len(values)
+    )
+
+    # A tally is only worth its width when the field is a CATEGORY -- when values repeat,
+    # so the counts say something about the distribution. Two cases where they never do:
+    #
+    # - the field already has a range (a date or a number), where "2026-09-07T16:27:17=1,
+    #   2026-08-28T22:05:35=1, ..." is the column reprinted one value at a time; and
+    # - every value occurs exactly once, which means it is an id or free text.
+    #
+    # Both were costing ~130 tokens per field to say nothing: four timestamp columns and
+    # two id columns made up over half of a 1,402-token profile of twenty rows. The range
+    # or a couple of examples carries the same information in a tenth of the space.
+    ranged = "min" in result
+    unique = len(values) == entry["present"]
+
+    if entry["distinct_overflow"] or unique:
+        if not ranged:
+            result["examples"] = list(values)[:EXAMPLES]
+    elif not ranged:
         result["values"] = dict(sorted(values.items(), key=lambda kv: -kv[1]))
 
     return result
@@ -168,14 +184,28 @@ def table(profiles: list[dict]) -> str:
     if not profiles:
         return "(no fields -- the dataset is empty)"
 
-    width = min(max(len(p["field"]) for p in profiles), 34)
+    # A field null in every row needs its name carried (so nobody queries it expecting
+    # data) but not a row of zeroes and a blank content column. Named in one line instead.
+    present = [p for p in profiles if p["present"]]
+    empty = [p["field"] for p in profiles if not p["present"]]
+
+    if not present:
+        return f"every field was null in all rows: {', '.join(empty)}"
+
+    width = min(max(len(p["field"]) for p in present), 34)
     lines = [f"{'field'.ljust(width)}  present   nulls  type            content"]
 
-    for p in profiles:
+    for p in present:
         lines.append(
             f"{p['field'][:width].ljust(width)}  "
             f"{p['present']:>7}  {p['nulls']:>6}  "
             f"{'/'.join(p['types'])[:14].ljust(14)}  {_content(p)}"
+        )
+
+    if empty:
+        lines.append(
+            f"\nnull in all {profiles[0]['present'] + profiles[0]['nulls']} rows "
+            f"({len(empty)} fields): {', '.join(empty)}"
         )
 
     return "\n".join(lines)

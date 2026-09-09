@@ -2,7 +2,31 @@ from src.tools.registry import SCHEMAS as all_tools
 
 # Workers must not spawn workers. Filtered into a new list rather than removed from
 # all_tools, which is the same object the orchestrator is bound to.
-EXCLUDED = {"StartBackgroundTask", "CheckBackgroundTask", "DeliverTask"}
+#
+# The destructive tools come out for the reason the html builder's do, only more so. This
+# is the one agent that runs with nobody at the keyboard -- executor.py skips approval
+# entirely when CURRENT_TASK is set -- so it was also the one agent that could delete or
+# move files anywhere in the user's project without a prompt. Nothing in its job needs
+# that: it writes into its own task folder, and delivery to the user's project is done by
+# the runtime's deliver(), a shutil.copy2 loop the model never touches. UpdateFile stays,
+# because the prompt tells it to revise what it wrote.
+#
+# SearchConversationHistory comes out as a correctness measure. A worker cannot ask
+# questions, so when its instructions are thin the tool invites it to go reconstruct intent
+# from every past session -- including decisions the user has since reversed. Removing it
+# turns a silent wrong guess into the visible "I could not do X" its prompt already asks
+# for, and puts the burden back where it belongs: on the orchestrator writing standalone
+# instructions.
+EXCLUDED = {
+    "StartBackgroundTask",
+    "CheckBackgroundTask",
+    "DeliverTask",
+    "DeleteFile",
+    "DeleteDir",
+    "MovePath",
+    "CopyPath",
+    "SearchConversationHistory",
+}
 
 SCHEMAS = [schema for schema in all_tools if schema.__name__ not in EXCLUDED]
 # The strongest model in the project, and deliberately a tier above the orchestrator. This

@@ -4,6 +4,13 @@ from src.tools.files.schemas import ReadFile, SearchFile
 # The builder must not spawn workers, author skills, recurse into itself, or delete
 # anything -- a page builder has no business removing files. Filtered into a new list
 # rather than removed from all_tools, which is the same object the orchestrator is bound to.
+#
+# The second group is not about blast radius but about cost. BUILDER_PROMPT tells the
+# builder it has "file tools ... and web tools", and nothing else: its data arrives in the
+# brief, already fetched and counted by whoever called it. Every schema bound here is
+# re-sent on every step of the build loop, so a tool the prompt never mentions is pure
+# per-iteration overhead -- and a data tool within reach of an agent told to render numbers
+# rather than gather them is an invitation to go gather different ones.
 EXCLUDED = {
     "StartBackgroundTask",
     "CheckBackgroundTask",
@@ -14,6 +21,13 @@ EXCLUDED = {
     "MovePath",
     "DeleteFile",
     "DeleteDir",
+    # not the builder's job -- see above
+    "ListSkills",
+    "SearchGhlOperations",
+    "DescribeGhlOperation",
+    "ExecuteGhlOperation",
+    "FetchGhlDataset",
+    "SearchConversationHistory",
 }
 
 SCHEMAS = [schema for schema in all_tools if schema.__name__ not in EXCLUDED]

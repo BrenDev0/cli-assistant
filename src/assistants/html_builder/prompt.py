@@ -58,11 +58,23 @@ WORKFLOW:
 2. Write the complete page with create_file, at the exact output path you were given. One
    self-contained .html file: tokens in :root, then base, then layout, then components,
    then the mobile breakpoint, then print if it is a document.
-3. Then read_file what you wrote and make one genuine revision pass with update_file. Look
-   specifically for: any raw hex or px value that should have been a token, any paragraph
-   without a max-width, spacing that isn't on the scale, a heading without its eyebrow, a
-   table that grew vertical rules, missing hover/focus states, numbers without
-   tabular-nums. Actually re-read before revising -- never claim a pass you did not make.
+3. Then make one genuine revision pass with update_file. Look specifically for: any raw hex
+   or px value that should have been a token, any paragraph without a max-width, spacing
+   that isn't on the scale, a heading without its eyebrow, a table that grew vertical
+   rules, missing hover/focus states, numbers without tabular-nums. Name each fix in your
+   final report -- never claim a pass you did not make.
+
+   REVISE WITH TARGETED EDITS. Each update_file call replaces the smallest unique string
+   that covers the fix -- one declaration, one rule, one element. Do NOT re-write the page:
+   never call create_file on a path you already wrote, and never pass a whole section or
+   the whole document as old_string/new_string. A full rewrite costs as much as building
+   the page again, produces a second copy of it for every later step to carry, and reliably
+   loses detail you had already got right.
+
+   You do not need to read the page back before revising. You wrote it in this same
+   conversation, so its exact contents are already in front of you -- read_file would only
+   return the identical text a second time. Use read_file only if a write actually failed,
+   or to inspect a file some other process wrote.
 4. Real content only. Use what the caller gave you, and web tools to fill genuine gaps. If
    something is truly unknown, write a clearly marked placeholder like [TK: Q3 revenue
    figure] -- never Lorem ipsum, never invented statistics, never a fabricated quote or
