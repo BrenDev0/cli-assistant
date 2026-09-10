@@ -1,4 +1,6 @@
-# CLI Assistant
+# THE WAY
+
+*by xplorers*
 
 A terminal-based AI assistant built from scratch in Python, exploring agent
 architecture, tool-calling, background execution, and self-extending behavior
@@ -6,7 +8,7 @@ without relying on a pre-built agent framework.
 
 ## Overview
 
-CLI Assistant runs a conversational agent loop directly in the terminal. It
+THE WAY runs a conversational agent loop directly in the terminal. It
 maintains conversation state across turns, exposes 25 tools the model can call
 (file system, GoHighLevel CRM, dataset fetching, web search, HTML authoring,
 background tasks, conversation history), and executes those calls through an async
@@ -22,14 +24,30 @@ Two features shape most of the design:
   instruction folders it discovers and follows on later turns, giving it a
   simple form of durable, inspectable capability growth.
 
+It can also be talked to instead of typed at (`/voice`), left to apply its own
+edits (`shift+tab`), and started in Spanish (`theway_es`).
+
 ## Install
 
 ```bash
 git clone <this repo> && cd cli-assistant
 uv sync                     # create .venv and install dependencies
-uv tool install -e .        # `the-way` on PATH, tracks your edits
+uv tool install -e .        # puts the commands on PATH, tracks your edits
 uv tool update-shell        # once, if the command isn't found
 ```
+
+Four commands are installed, two spellings each because a shell command cannot
+contain a space:
+
+| command | |
+|---|---|
+| `the-way`, `theway` | English interface |
+| `the-way-es`, `theway_es` | Spanish interface |
+
+Because the install is editable, code changes are live on the next launch. Only
+a new dependency or a change to `[project.scripts]` needs
+`uv tool install --editable . --reinstall` — and it has to be run with the app
+closed, since a running instance holds its own executable open on Windows.
 
 Create a `.env` **in the cloned repo directory** with at least one model key:
 
@@ -78,12 +96,42 @@ absence is invisible until something asks for it.
 ```
 $ the-way
 
-  the way
-  ──────────────────────────────────────────────
-  25 tools · 4 GHL · gpt-5.1
-  /help for commands · 'exit' to leave
+   █████ █   █ █████   █   █  ███  █   █
+     █   █   █ █       █   █ █   █  █ █
+     █   █████ ████    █ █ █ █████   █
+     █   █   █ █       ██ ██ █   █   █
+     █   █   █ █████   █   █ █   █   █
 
-> how many contacts do I have, and how many have an email address?
+   by xplorers
+
+   MODEL   gpt-5.4
+   TOOLS   25 local · 4 ghl
+   SESSION 20260910-130000-aa11
+   CWD     ~/Desktop/acme-report
+
+   /help for commands · shift+tab for auto mode · 'exit' to leave
+
+  ❯ how many contacts do I have, and how many have an email address?
+  ◆ You have 1,842 contacts, and 1,203 of them have an email address.
+  5,908 tokens · 2.1s
+
+  ╭───────────────────────────────────────────────────────────────────╮
+  │ ❯                                                                 │
+  ╰─ gpt-5.4 · approve · text ────────────────────────────────────────╯
+```
+
+The input sits in a bordered box held at the bottom of the terminal, and its
+bottom edge states the model, whether edits are being approved or applied
+automatically, and whether you are typing or talking. Replies stream in as they
+are written. While background tasks are running, a second box appears above the
+input listing each one, what it is doing right now, and how long it has been at
+it:
+
+```
+  ╭─ 2 running ───────────────────────────────────────────────────────╮
+  │ a3f1     hacker news website report          WebSearch       12s │
+  │ b2c9     audit contacts for missing phones   FetchGhlData     4s │
+  ╰───────────────────────────────────────────────────────────────────╯
 ```
 
 Ask questions about the CRM in plain language. Anything touching GoHighLevel is
@@ -133,8 +181,14 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
 | `/compress` | summarise the conversation and drop the transcript |
 | `/clear` | drop the conversation entirely |
 | `/model [name]` | show or switch the model mid-conversation |
+| `/voice` | toggle talking to it instead of typing |
+| `shift+tab` | toggle auto mode — apply edits without asking |
 | `/help` | list commands |
 | `exit` | leave |
+
+Commands stay reachable in voice mode: the microphone is live while the prompt
+waits, but anything typed wins and the audio is discarded, so `/voice` can be
+typed to turn itself off.
 
 ## Architecture
 
@@ -146,9 +200,15 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
   root is a runtime lookup rather than an import-time constant, so it can be
   scoped per session later instead of per process.
 - **Frontend protocol** (`src/core/frontend.py`) — the core reports progress and
-  requests approval through a protocol, never by printing. `CliFrontend`
-  implements it for the terminal; a web frontend would implement the same six
-  methods. Nothing in `src/core` or `src/tools` imports a UI library.
+  requests approval through a protocol, never by printing: tool started, tool
+  failed, tokens, reply chunk, reply finished, file changed, task started, task
+  finished, approve. `CliFrontend` implements it for the terminal; a web frontend
+  would implement the same nine methods. Nothing in `src/core` or `src/tools`
+  imports a UI library.
+- **Language table** (`src/core/lang.py`) — every string a person reads, keyed
+  and available in English and Spanish. Text written *for the model* stays in
+  English wherever it is defined; it is instruction, not interface, and
+  translating it would change behaviour rather than presentation.
 - **Tools layer** (`src/tools`) — a registry mapping Pydantic schemas to Python
   functions, with a generic `executor` that dispatches by tool name, supports
   sync and async implementations, emits tool events, and gates write operations
@@ -165,8 +225,13 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
     passes over the same assistant: an art-direction pass with no write tools
     that commits to typefaces, hex values and layout in a written brief, then a
     build pass that executes it and revises itself once.
-- **CLI** (`src/cli`) — prompt_toolkit chat loop, command dispatcher, styled
-  output, and the status bar showing live background-task activity.
+- **CLI** (`src/cli`) — the chat loop, command dispatcher and styled output.
+  `inputbox.py` owns a prompt_toolkit `Application` that runs for the whole
+  session, `diff.py` renders unified diffs as banded lines, and `ui.py` holds
+  every glyph, colour and width in one place with an ASCII fallback throughout.
+- **Voice** (`src/voice`) — microphone and speaker access over PortAudio,
+  transcription and speech in `speech.py`, and a `Speaker` that pipelines
+  sentences to the speakers while the model is still writing.
 
 ## Tools
 
@@ -212,7 +277,46 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
   result is never orphaned from its call. Trimmed turns stay searchable on disk.
 - **Human in the loop on writes** — file creation, updates, and deletion prompt
   for approval with three outcomes: yes, no, or redirect with an instruction the
-  model must follow instead.
+  model must follow instead. `shift+tab` turns that gate off for a session when
+  the work is repetitive, and the diff still prints either way: in auto mode it
+  is the only account of what changed, and watching the edits go by is the point
+  of not being asked about them.
+- **An approval shows the change, not the receipt** — the diff used to be
+  emitted after the write, so a gated edit read as announce, show the finished
+  change, then ask permission. `preview_update` computes what the edit *would*
+  write without writing it, and the executor hands that to the prompt, so the
+  diff you approve is a proposal. One render path, two decision paths.
+- **Replies stream** — the agent loop accumulates `astream` chunks rather than
+  awaiting a whole response, which cut the dead period after Enter from about
+  four seconds to under one. Two details are load-bearing: OpenAI needs
+  `stream_usage=True` or a streamed response carries no usage at all and every
+  turn silently reports zero tokens, and output is emitted a whole line at a
+  time because `patch_stdout` only flushes what it is given on a newline.
+- **Line endings are normalised on the way in and out** — `write_text` on
+  Windows turns every newline into a carriage-return pair, while the reader took
+  the bytes as they were. So a file the assistant wrote came back with `CRLF`, a
+  multi-line `old_string` written with `LF` matched nothing, and each further
+  write added another carriage return until the file had a blank line between
+  every real one. Reads collapse any run of carriage returns before a newline,
+  which also repairs a file already damaged that way; writes pass `newline` so
+  nothing is translated.
+- **The input box owns its own layout** — a `PromptSession` renders its input
+  wherever the cursor happens to be and pins a `bottom_toolbar` to the last row
+  of the terminal, so on anything but a full screen the two are separated by
+  every unused row between them. Holding both at the bottom means owning the
+  layout: an empty window above the border takes the slack. The application runs
+  for the whole session rather than once per turn, so the box stays on screen
+  while a turn is worked on, and the approval question is answered in it —
+  only one application can hold the terminal at a time.
+- **Voice is a pipeline, not a mode switch** — speech goes to
+  `gpt-4o-transcribe`, the text enters the loop exactly where typed input does,
+  and the reply is spoken back, so the agent, tools and approval gate are
+  untouched. Two things make it feel live: sentences are handed to the speakers
+  as the model completes them rather than at the end of the reply, and
+  synthesis runs ahead of playback through a bounded queue — synthesising each
+  sentence only when the previous one finished left three-second silences
+  between them. Voice mode also asks the model for plain spoken prose, since
+  bullet points and asterisks are read aloud as punctuation.
 - **Global workspace, local projects** — skills and history live in
   `~/.the_way/` so they follow the user, while deliverables stay in the
   project. Skills built in one directory used to be invisible in every other.
@@ -281,8 +385,10 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
 - **Python 3.12+**
 - **LangChain** (`langchain-openai`, `langchain-anthropic`) — chat model
   abstraction
-- **prompt_toolkit** — async prompt, status bar, output that survives
-  concurrent writes from background tasks
+- **prompt_toolkit** — the input application, output that survives concurrent
+  writes from background tasks
+- **sounddevice** (PortAudio) — microphone capture and speaker playback for
+  voice mode; OpenAI `gpt-4o-transcribe` and `gpt-4o-mini-tts` do the rest
 - **Pydantic / Pydantic Settings** — tool schemas and environment configuration
 - **Tavily** — web search and extraction
 - **MCP** (hand-rolled streamable-HTTP client) — GoHighLevel integration
