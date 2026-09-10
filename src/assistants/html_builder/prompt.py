@@ -9,7 +9,7 @@ and gives the builder something it can be held to.
 
 from .design import DESIGN_SYSTEM
 
-BRAND_OVERRIDE_PATH = ".my_assistant/design/brand.md"
+BRAND_OVERRIDE_PATH = ".the_way/design/brand.md"
 
 
 DESIGNER_PROMPT = f"""You are an art director. You do not write HTML. You decide what the

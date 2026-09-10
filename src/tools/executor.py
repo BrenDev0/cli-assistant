@@ -1,8 +1,10 @@
 import inspect
 import asyncio
 
-from src.core import frontend
+from src.core import frontend, mode
 from src.core.context import CURRENT_TASK
+from src.core.frontend import Decision
+from src.tools.files.tools import preview_update
 from .registry import (
     TOOL_REGISTRY,
     UpdateFile,
@@ -39,6 +41,21 @@ REDIRECTED = (
 # the question keeps each one whole.
 _APPROVAL = asyncio.Lock()
 
+PREVIEWS = {"UpdateFile": preview_update}
+
+
+def _preview(tool_name: str, params: dict):
+    """The diff a gated tool would produce, for the approval prompt to show. Best effort
+    -- a preview that cannot be built must never stop the call being offered."""
+    builder = PREVIEWS.get(tool_name)
+    if builder is None:
+        return None
+
+    try:
+        return builder(**params)
+    except Exception:
+        return None
+
 
 async def executor(tool_name: str, params: dict):
     if tool_name not in TOOL_REGISTRY.keys():
@@ -49,9 +66,20 @@ async def executor(tool_name: str, params: dict):
     # a background worker has nobody at the keyboard -- prompting there would hang the
     # task behind a question the user never sees
     if tool_name in REQUIRE_APPROVAL and not CURRENT_TASK.get():
+        preview = _preview(tool_name, params)
+
         async with _APPROVAL:
             frontend.tool_started(tool_name, params)
-            decision = await frontend.approve(tool_name, params)
+
+            # shown either way: in auto mode it is the only account of what changed, and
+            # watching the edits go by is the point of not being asked about them
+            if preview:
+                frontend.file_changed(*preview)
+
+            decision = (
+                Decision(True) if mode.auto()
+                else await frontend.approve(tool_name, params)
+            )
 
         if not decision.approved:
             return REDIRECTED.format(feedback=decision.feedback) if decision.feedback else DENIED

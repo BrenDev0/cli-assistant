@@ -1,11 +1,12 @@
 import re
 import shutil
 from pathlib import Path
+from src.core import frontend
 from src.core.workspace import ASSISTANT_PREFIX, assistant_home, project_root
 
 
 def _split_root(user_path: str) -> tuple[Path, Path]:
-    """A leading '.my_assistant/' always means the global workspace, whatever project is
+    """A leading '.the_way/' always means the global workspace, whatever project is
     active. Everything else is project-relative. One rule, so the same path string means
     the same place from any directory."""
     parts = [p for p in str(user_path).replace("\\", "/").split("/") if p not in ("", ".")]
@@ -36,6 +37,23 @@ TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp1252", "latin-1")
 
 
 def _read_text(path: Path) -> str:
+    # Every line ending becomes \n on the way in, and _write_text keeps it that way on
+    # the way out. Without this, write_text turned each \n into \r\n and the next read
+    # handed the model \r\n back: a multi-line old_string written with \n then matched
+    # nothing, and each further write added another \r, so a file gained a blank line
+    # between every real one on every edit.
+    #
+    # \r+\n rather than \r\n, so a file already damaged that way is repaired on the next
+    # read instead of keeping its phantom lines as real ones. A run of carriage returns
+    # before a newline is the damage signature; nothing writes it on purpose.
+    return re.sub(r"\r+\n", "\n", _decode(path)).replace("\r", "\n")
+
+
+def _write_text(path: Path, content: str) -> None:
+    path.write_text(content, encoding="utf-8", newline="\n")
+
+
+def _decode(path: Path) -> str:
     raw = path.read_bytes()
 
     if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
@@ -163,9 +181,34 @@ def create_file(file_path: str, content: str = "", overwrite: bool = False) -> s
     if path.exists() and not overwrite:
         raise FileExistsError(f"File already exits: {path}. Pass overwrite=True to replace it")
 
+    before = _read_text(path) if path.exists() else ""
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    _write_text(path, content)
+
+    frontend.file_changed(_shown(path), before, content)
     return _shown(path)
+
+
+def preview_update(
+    file_path: str, old_string: str, new_string: str, replace_all: bool = False
+) -> tuple[str, str, str] | None:
+    """What update_file would write, without writing it -- so the approval prompt can
+    show the change being asked about rather than one already made. None when the edit
+    could not apply; update_file itself then raises the real error."""
+    path = _safe_path(file_path)
+    if not path.exists():
+        return None
+
+    content = _read_text(path)
+    if content.count(old_string) == 0:
+        return None
+
+    return (
+        _shown(path),
+        content,
+        content.replace(old_string, new_string, -1 if replace_all else 1),
+    )
 
 
 def update_file(file_path: str, old_string: str, new_string: str, replace_all: bool = False) -> str:
@@ -183,8 +226,11 @@ def update_file(file_path: str, old_string: str, new_string: str, replace_all: b
             "Pass replace_all=True or make old_string more specific"
         )
 
+    # no file_changed here: the approval prompt already showed this exact diff, and
+    # printing it again after the write reads as a second, separate edit
     new_content = content.replace(old_string, new_string, -1 if replace_all else 1)
-    path.write_text(new_content, encoding="utf-8")
+    _write_text(path, new_content)
+
     return _shown(path)
 
 

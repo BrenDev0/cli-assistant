@@ -29,11 +29,11 @@ def deliver(task_folder: str, destination: str) -> str:
 
     source = tasks_dir() / task_folder
     if not source.is_dir():
-        return f"Nothing to deliver -- .my_assistant/tasks/{task_folder}/ does not exist."
+        return f"Nothing to deliver -- .the_way/tasks/{task_folder}/ does not exist."
 
     files = sorted(p for p in source.rglob("*") if p.is_file())
     if not files:
-        return f"Nothing to deliver -- .my_assistant/tasks/{task_folder}/ is empty."
+        return f"Nothing to deliver -- .the_way/tasks/{task_folder}/ is empty."
 
     target = _safe_path(destination)
     target.mkdir(parents=True, exist_ok=True)
@@ -95,14 +95,14 @@ async def start_background_task(
 
     started = (
         f"Started background task {task_id}: {description}. "
-        f"Working files go to .my_assistant/tasks/{task_folder}/"
+        f"Working files go to .the_way/tasks/{task_folder}/"
     )
     if deliver_to:
         return f"{started}, and the finished files will be delivered to {deliver_to}/ automatically."
 
     return (
         f"{started}. No delivery folder was set, so the output will stay in "
-        f".my_assistant/tasks/ where the user cannot easily open it -- tell them that, and "
+        f".the_way/tasks/ where the user cannot easily open it -- tell them that, and "
         f"ask where they want it so you can call DeliverTask with id {task_id}."
     )
 
@@ -134,7 +134,7 @@ def _finish(task_id: str, t: asyncio.Task):
                 rec["result"] = (
                     f"{result}\nDelivery to {rec['deliver_to']}/ FAILED "
                     f"({type(exc).__name__}: {exc}). The files are still in "
-                    f".my_assistant/tasks/{rec['folder']}/ -- tell the user the delivery "
+                    f".the_way/tasks/{rec['folder']}/ -- tell the user the delivery "
                     f"failed and offer to retry it with DeliverTask."
                 )
 
@@ -170,7 +170,7 @@ async def check_background_task(task_id: str):
 
     response = (
         f"Task status is {task['status']}. "
-        f"Working folder: .my_assistant/tasks/{task['folder']}/"
+        f"Working folder: .the_way/tasks/{task['folder']}/"
     )
 
     if task["result"]:

@@ -6,6 +6,9 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from src.assistants.orchestrator.config import MODEL, SCHEMAS
 from src.core.agents.langchain.agent import AVAILABLE_MODELS, LangchainAgent, provider_for
 from src.core.agents.types import Message
+from src.core.lang import t
+
+from src import voice
 
 from . import ui
 
@@ -100,11 +103,17 @@ def count_tokens(messages: list[Message], model: str = MODEL) -> dict[str, int]:
 def tokens_report(messages: list[Message], model: str = MODEL) -> str:
     counts = count_tokens(messages, model)
     floor = counts["tools"] + counts["prefix"]
+    labels = [t(f"tokens.{name}")
+              for name in ("schemas", "prefix", "history", "total")]
+    pad = max(len(label) for label in labels)
+
     return (
-        f"tool schemas   {counts['tools']:>7,}\n"
-        f"  static prefix  {counts['prefix']:>7,}\n"
-        f"  history        {counts['history']:>7,}  ({counts['turns']} messages)\n"
-        f"  total          {counts['total']:>7,}  (floor {floor:,} cannot be compressed)"
+        f"{labels[0]:<{pad}} {counts['tools']:>9,}\n"
+        f"  {labels[1]:<{pad}} {counts['prefix']:>9,}\n"
+        f"  {labels[2]:<{pad}} {counts['history']:>9,}"
+        f"  ({counts['turns']} {t('tokens.messages')})\n"
+        f"  {labels[3]:<{pad}} {counts['total']:>9,}"
+        f"  ({t('tokens.floor', floor=f'{floor:,}')})"
     )
 
 
@@ -112,7 +121,7 @@ async def compress(messages: list[Message], model: str = MODEL) -> tuple[list[Me
     """Replace the conversation tail with a summary, keeping the static prefix intact."""
     history = messages[HISTORY_START:]
     if not history:
-        return messages, "nothing to compress"
+        return messages, t("cmd.nothing_to_compress")
 
     before = count_tokens(messages, model)
 
@@ -120,7 +129,9 @@ async def compress(messages: list[Message], model: str = MODEL) -> tuple[list[Me
 
     # tools=None: the summariser must not start calling tools mid-summary, and invoke()
     # would otherwise run a full agent loop over an 18-tool binding
-    summariser = LangchainAgent(model=model, temperature=0.0, tools=None)
+    # stream=False as well: a summary is bookkeeping, not a reply, and streaming it would
+    # print the whole transcript summary over the conversation it just replaced
+    summariser = LangchainAgent(model=model, temperature=0.0, tools=None, stream=False)
     summary = await summariser.invoke([
         ("system", COMPRESS_PROMPT),
         ("user", transcript),
@@ -132,9 +143,12 @@ async def compress(messages: list[Message], model: str = MODEL) -> tuple[list[Me
     after = count_tokens(compressed, model)
     saved = before["total"] - after["total"]
 
-    return compressed, (
-        f"compressed {before['turns']} messages -> summary, "
-        f"{before['total']:,} -> {after['total']:,} tokens (saved {saved:,})"
+    return compressed, t(
+        "cmd.compressed",
+        before=before["turns"],
+        from_=f"{before['total']:,}",
+        to=f"{after['total']:,}",
+        saved=f"{saved:,}",
     )
 
 
@@ -146,7 +160,8 @@ def switch_model(agent: LangchainAgent, requested: str) -> LangchainAgent:
         temperature=agent._temperature,
         tools=agent._tools,
     )
-    ui.notice(f"model -> {requested} ({provider_for(requested)})")
+    ui.notice(t("cmd.model_switched", model=requested,
+               provider=provider_for(requested)))
     return replacement
 
 
@@ -162,7 +177,8 @@ async def handle(
 
     if name == "/model":
         if len(parts) < 2:
-            ui.notice(f"current: {current}\n  available: {', '.join(AVAILABLE_MODELS)}")
+            ui.notice(t("cmd.model_current", model=current,
+                      available=", ".join(AVAILABLE_MODELS)))
             return messages, agent
 
         try:
@@ -172,7 +188,7 @@ async def handle(
         return messages, agent
 
     if name in ("/compress", "/compact"):
-        ui.notice("compressing...")
+        ui.notice(t("cmd.compressing"))
         messages, report = await compress(messages, current)
         ui.notice(report)
         return messages, agent
@@ -181,20 +197,24 @@ async def handle(
         ui.notice(tokens_report(messages, current))
         return messages, agent
 
+    if name == "/voice":
+        try:
+            on = await voice.toggle()
+        except Exception as exc:
+            ui.error(t("voice.unavailable", error=exc))
+            return messages, agent
+
+        ui.notice(t("voice.on" if on else "voice.off"))
+        return messages, agent
+
     if name == "/clear":
         dropped = len(messages) - HISTORY_START
-        ui.notice(f"cleared {dropped} messages")
+        ui.notice(t("cmd.cleared", count=dropped))
         return messages[:HISTORY_START], agent
 
     if name == "/help":
-        ui.notice(
-            "/compress  summarise the conversation and drop the transcript\n"
-            "  /tokens    show what is filling the context\n"
-            "  /clear     drop the conversation entirely\n"
-            "  /model     show or switch the model\n"
-            "  exit       leave"
-        )
+        ui.notice(t("cmd.help"))
         return messages, agent
 
-    ui.error(f"unknown command {name} — try /help")
+    ui.error(t("cmd.unknown", name=name))
     return messages, agent

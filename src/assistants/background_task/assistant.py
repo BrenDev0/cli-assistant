@@ -13,7 +13,7 @@ FAILURE_MARKER = "TASK FAILED"
 class BackgroundTaskAssistant:
     """Delegates to an injected Agent with the orchestrator's tools minus the background
     ones, and turns a (task_folder, instructions) request into finished files under
-    .my_assistant/tasks/<task_folder>/ plus a short report of what it produced.
+    .the_way/tasks/<task_folder>/ plus a short report of what it produced.
 
     Its return value is a *report*, not a payload: the artifacts stay on disk so they
     never round-trip through the orchestrator's context."""
@@ -22,7 +22,7 @@ class BackgroundTaskAssistant:
         self._agent = agent
 
     async def work(self, task_folder: str, instructions: str) -> str:
-        path = f".my_assistant/tasks/{task_folder}/"
+        path = f".the_way/tasks/{task_folder}/"
 
         messages = [
             ("system", SYSTEM_PROMPT),
@@ -52,6 +52,6 @@ class BackgroundTaskAssistant:
         files = sorted(p.name for p in directory.rglob("*") if p.is_file()) if directory.exists() else []
 
         if not files:
-            return f"NO FILES were written to .my_assistant/tasks/{task_folder}/."
+            return f"NO FILES were written to .the_way/tasks/{task_folder}/."
 
-        return f"Files in .my_assistant/tasks/{task_folder}/: {', '.join(files)}."
+        return f"Files in .the_way/tasks/{task_folder}/: {', '.join(files)}."

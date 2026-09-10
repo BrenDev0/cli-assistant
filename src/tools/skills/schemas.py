@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 class ListSkills(BaseModel):
-    """List the skills currently available under .my_assistant/skills/, showing
+    """List the skills currently available under .the_way/skills/, showing
     each one's name and one-line description. Call this to check what skills exist
     before deciding whether one applies to the user's request."""
 
@@ -13,7 +13,7 @@ class BuildSkill(BaseModel):
     created or changed."""
     skill_name: str = Field(
         description="A short, filesystem-safe, kebab-case name, e.g. 'pdf-report-generator'. "
-        "Used verbatim as the folder name under .my_assistant/skills/<skill_name>/. "
+        "Used verbatim as the folder name under .the_way/skills/<skill_name>/. "
         "Reuse the exact same skill_name to update an existing skill rather than "
         "create a duplicate."
     )

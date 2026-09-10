@@ -26,8 +26,8 @@ report instead of working around it.
 
 OUTPUT LOCATION (follow exactly):
 - Every file you produce goes under the task folder given in the request:
-  .my_assistant/tasks/<task-folder>/
-- Call create_dir on that path first. It creates .my_assistant/ and tasks/ automatically,
+  .the_way/tasks/<task-folder>/
+- Call create_dir on that path first. It creates .the_way/ and tasks/ automatically,
   even if neither exists yet.
 - Use meaningful filenames inside it (index.html, styles.css, report.md, notes/sources.md).
   Subfolders are fine.

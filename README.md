@@ -27,7 +27,7 @@ Two features shape most of the design:
 ```bash
 git clone <this repo> && cd cli-assistant
 uv sync                     # create .venv and install dependencies
-uv tool install -e .        # `my_assistant` on PATH, tracks your edits
+uv tool install -e .        # `the-way` on PATH, tracks your edits
 uv tool update-shell        # once, if the command isn't found
 ```
 
@@ -39,10 +39,10 @@ OPENAI_API_KEY=...
 
 The `.env` is always read from the clone (`settings.py` resolves it from the
 package location), never from the directory you launch in. That matters because
-`my_assistant` is meant to be run from whatever project you are working on — the
+`the-way` is meant to be run from whatever project you are working on — the
 launch directory is the project, but the configuration stays with the code.
 
-Then run `my_assistant` from any directory. Everything except the model key is
+Then run `the-way` from any directory. Everything except the model key is
 optional: missing integrations print one line at startup and disable their own
 tools, so a first run works with nothing but `OPENAI_API_KEY`.
 
@@ -76,9 +76,9 @@ absence is invisible until something asks for it.
 ### First run
 
 ```
-$ my_assistant
+$ the-way
 
-  my_assistant
+  the way
   ──────────────────────────────────────────────
   25 tools · 4 GHL · gpt-5.1
   /help for commands · 'exit' to leave
@@ -90,7 +90,7 @@ Ask questions about the CRM in plain language. Anything touching GoHighLevel is
 delegated to a background task, so the answer arrives a little later and the
 prompt stays usable meanwhile — you will be asked which folder finished files
 should land in. Counting questions pull the whole result set to
-`~/.my_assistant/data/` first; the reply states the row count it is based on, and
+`~/.the_way/data/` first; the reply states the row count it is based on, and
 says so explicitly when a fetch came back partial.
 
 ## Where things live
@@ -98,7 +98,7 @@ says so explicitly when a fetch came back partial.
 Two roots, deliberately separated:
 
 ```
-~/.my_assistant/          global workspace — follows you between projects
+~/.the_way/          global workspace — follows you between projects
     skills/               built once, available everywhere
     history/              every conversation, searchable across projects
     tasks/                background task output and records
@@ -107,7 +107,7 @@ Two roots, deliberately separated:
 <launch directory>/       the active project — your own files
 ```
 
-A path beginning `.my_assistant/` always resolves to the global workspace, from
+A path beginning `.the_way/` always resolves to the global workspace, from
 any directory. Everything else is project-relative. File tools are sandboxed to
 those two roots and reject anything that would escape either.
 
@@ -158,9 +158,9 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
   - **Background Task** — spawned per task, gets every tool except the
     background ones so workers cannot spawn workers, and a higher iteration
     cap (30) because research burns steps before it writes anything. Output goes
-    to `~/.my_assistant/tasks/<slug>-<id>/`.
+    to `~/.the_way/tasks/<slug>-<id>/`.
   - **Skill Builder** — file tools only, authors `SKILL.md` under
-    `~/.my_assistant/skills/<name>/`.
+    `~/.the_way/skills/<name>/`.
   - **HTML Builder** — authors one self-contained, designed HTML page. Runs two
     passes over the same assistant: an art-direction pass with no write tools
     that commits to typefaces, hex values and layout in a written brief, then a
@@ -214,10 +214,10 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
   for approval with three outcomes: yes, no, or redirect with an instruction the
   model must follow instead.
 - **Global workspace, local projects** — skills and history live in
-  `~/.my_assistant/` so they follow the user, while deliverables stay in the
+  `~/.the_way/` so they follow the user, while deliverables stay in the
   project. Skills built in one directory used to be invisible in every other.
 - **A task's workspace is not its delivery address** — a worker still does all
-  its work in `~/.my_assistant/tasks/<slug>/`, which keeps drafts out of the
+  its work in `~/.the_way/tasks/<slug>/`, which keeps drafts out of the
   project, but that folder is unreachable for anyone who does not already know
   it exists. So `StartBackgroundTask` takes a `deliver_to` folder, asked of the
   user before the task starts, and the runtime copies the finished files there
@@ -236,7 +236,7 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
   answering "how many contacts converted last month" from it is wrong twice
   over: it describes 20 of several thousand records, and the arithmetic happens
   by impression inside a context window. `FetchGhlDataset` pages the whole
-  result set to `.my_assistant/data/<name>-<date>/rows.ndjson` and returns a
+  result set to `.the_way/data/<name>-<date>/rows.ndjson` and returns a
   *manifest* — row count against the total GHL itself reported, per-field null
   rates and value ranges, and the path. The rows never enter anyone's context,
   which is the same argument as `copy_path`: data a model retypes is data it can
@@ -273,7 +273,7 @@ GHL_LOCATION_ID=...        # optional, required alongside GHL_PIT
   commit to typefaces, hex values and a layout in writing before any markup
   exists. Styling stays inside that assistant rather than becoming a design
   agent it calls: design and markup are one artifact, and a separate agent would
-  be writing CSS for a DOM it cannot see. `.my_assistant/design/brand.md`
+  be writing CSS for a DOM it cannot see. `.the_way/design/brand.md`
   overrides the house system per user.
 
 ## Frameworks & tools

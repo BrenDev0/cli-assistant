@@ -1,9 +1,16 @@
 from pathlib import Path
 
+from src.core.lang import t
+
 # Global, machine-wide: skills and conversation history live here so they follow the user
 # between projects instead of vanishing whenever they cd somewhere else.
-ASSISTANT_PREFIX = ".my_assistant"
+ASSISTANT_PREFIX = ".the_way"
 ASSISTANT_HOME = Path.home() / ASSISTANT_PREFIX
+
+# what the workspace was called before the rename. Kept only so an existing install
+# keeps its skills, history, tasks and datasets instead of silently starting empty.
+LEGACY_PREFIX = ".my_assistant"
+LEGACY_HOME = Path.home() / LEGACY_PREFIX
 
 # Where the user's own files live. A runtime lookup, not an import-time constant, so a
 # project can be chosen after import -- and so a future web frontend can scope it per
@@ -13,6 +20,24 @@ _project_root: Path = Path.cwd().resolve()
 
 def assistant_home() -> Path:
     return ASSISTANT_HOME
+
+
+def adopt_legacy_home() -> str | None:
+    """Move the workspace over from its old name, once. Returns a line to show the user
+    when something happened, None when there was nothing to do."""
+    if not LEGACY_HOME.is_dir():
+        return None
+
+    if ASSISTANT_HOME.exists():
+        return t("workspace.both", old=LEGACY_PREFIX, new=ASSISTANT_PREFIX)
+
+    try:
+        LEGACY_HOME.rename(ASSISTANT_HOME)
+    except OSError as exc:
+        return t("workspace.failed", old=LEGACY_PREFIX,
+                 new=ASSISTANT_PREFIX, error=exc)
+
+    return t("workspace.moved", old=LEGACY_PREFIX, new=ASSISTANT_PREFIX)
 
 
 def skills_dir() -> Path:

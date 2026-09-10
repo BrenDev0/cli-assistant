@@ -24,7 +24,7 @@ class StartBackgroundTask(BaseModel):
         description=(
             "Folder in the user's project where the finished files should be delivered, "
             "for example 'reports' or 'ghl_client_report'. The worker always does its "
-            "work in .my_assistant/tasks/, which the user cannot easily reach; whatever "
+            "work in .the_way/tasks/, which the user cannot easily reach; whatever "
             "you name here is copied there automatically the moment the task succeeds, "
             "so the deliverable lands somewhere the user can actually open. ASK the user "
             "which folder they want before starting any task that produces files they "
@@ -40,7 +40,7 @@ class CheckBackgroundTask(BaseModel):
 
 
 class DeliverTask(BaseModel):
-    """Copy a finished background task's files out of .my_assistant/tasks/ and into a
+    """Copy a finished background task's files out of .the_way/tasks/ and into a
     folder in the user's project, where they can actually open them.
 
     Use this whenever the user asks for a task's output to be moved, copied, or put

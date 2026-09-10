@@ -11,11 +11,17 @@ dependencies = [
     "langchain-openai>=1.4.1",
     "prompt-toolkit>=3.0.53",
     "pydantic-settings>=2.14.2",
+    "sounddevice>=0.5.6",
     "tavily-python>=0.8.0",
 ]
 
 [project.scripts]
-my_assistant = "src.cli.main:chat"
+# a shell command cannot contain a space, so both spellings of "the way" are registered
+the-way = "src.cli.main:chat"
+theway = "src.cli.main:chat"
+# same assistant, spanish interface
+the-way-es = "src.cli.main:chat_es"
+theway_es = "src.cli.main:chat_es"
 
 [build-system]
 requires = ["hatchling"]

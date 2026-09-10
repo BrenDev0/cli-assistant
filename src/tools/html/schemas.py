@@ -17,7 +17,7 @@ class BuildHtmlPage(BaseModel):
     output_path: str = Field(
         description="Where to write the page, relative to the project root, ending in "
         ".html -- e.g. 'reports/q3-review.html'. Parent directories are created as needed. "
-        "A path starting '.my_assistant/' writes to the global workspace instead."
+        "A path starting '.the_way/' writes to the global workspace instead."
     )
     page_type: Literal["report", "landing", "dashboard", "article"] = Field(
         description="Which design playbook to follow. 'report' for analyses, reviews and "

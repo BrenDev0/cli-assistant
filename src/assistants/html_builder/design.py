@@ -6,7 +6,7 @@ report" reaches for the median of its training data -- Arial, a centred h1, a ta
 specific values, named bans, and per-archetype playbooks.
 
 Edit this file to change the house style globally. A user can override it per-project by
-writing .my_assistant/design/brand.md, which both passes read before deciding anything.
+writing .the_way/design/brand.md, which both passes read before deciding anything.
 """
 
 DESIGN_SYSTEM = """

@@ -65,6 +65,17 @@ KEY_FIELDS = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
 AVAILABLE_MODELS = sorted(PROVIDERS)
 
 
+def _content_text(content) -> str:
+    """OpenAI streams plain strings, Anthropic streams a list of typed blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            block.get("text", "") for block in content if isinstance(block, dict)
+        )
+    return ""
+
+
 def provider_for(model: str) -> str:
     if model not in PROVIDERS:
         raise ValueError(
@@ -91,21 +102,28 @@ class LangchainAgent:
         api_key: str | None = None,
         temperature: float = 0.0,
         tools: list | None = None,
-        max_iterations: int = 10
+        max_iterations: int = 10,
+        stream: bool = True
     ):
         self._max_iterations = max_iterations
         self._model = model
         self._api_key = SecretStr(api_key or key_for(model))
         self._tools = tools
         self._temperature = temperature
+        self._stream = stream
         self.llm = self._get_model()
 
     def _get_model(self):
-        client = CLIENTS[provider_for(self._model)]
+        provider = provider_for(self._model)
+        client = CLIENTS[provider]
 
         kwargs = {"model_name": self._model, "api_key": self._api_key}
         if self._model in ACCEPTS_TEMPERATURE:
             kwargs["temperature"] = self._temperature
+        if provider == "openai":
+            # without this a streamed response carries no usage_metadata at all and
+            # every turn silently reports zero tokens
+            kwargs["stream_usage"] = True
 
         llm = client(**kwargs)
 
@@ -115,14 +133,37 @@ class LangchainAgent:
         return llm
 
 
+    async def _respond(self, messages: list[Message]):
+        """One model turn. Streamed, so the reply reaches the screen as it is written
+        rather than after the last token -- a 200 word answer was four seconds of
+        nothing. Tool-calling turns emit no text, so nothing leaks before a tool runs."""
+        if not self._stream:
+            return await self.llm.ainvoke(messages)
+
+        result = None
+        for_display = False
+
+        async for chunk in self.llm.astream(messages):
+            result = chunk if result is None else result + chunk
+
+            text = _content_text(chunk.content)
+            if text:
+                frontend.reply_chunk(text)
+                for_display = True
+
+        if for_display:
+            frontend.reply_finished()
+
+        return result
+
     async def invoke(self, messages: list[Message]) -> str:
         tokens_used = 0
         for _ in range(self._max_iterations):
-            result = await self.llm.ainvoke(messages)
+            result = await self._respond(messages)
             usage = getattr(result, "usage_metadata", None) or {}
             tokens_used += usage.get("total_tokens", 0)
             if not result.tool_calls:
-                content = result.content.strip() if result.content else ""
+                content = _content_text(result.content).strip()
                 messages.append(("assistant", content))
                 frontend.tokens(tokens_used)
                 tokens_used = 0
