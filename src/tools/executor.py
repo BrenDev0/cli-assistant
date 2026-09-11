@@ -11,14 +11,24 @@ from .registry import (
     MovePath,
     DeleteFile,
     DeleteDir,
+    ClickBrowserElement,
+    TypeInBrowser,
+    SendWhatsappMessage,
 )
 
 # Creating something new is cheap to undo and gets no prompt. Changing or removing
 # something that already exists does. MovePath is on this side of the line because it
 # unlinks the source; CopyPath only ever adds, so it is not gated.
+#
+# The browser tools that act rather than look are gated for a stronger reason: they
+# reach outside this machine. Opening and reading a page is navigation, but a click, a
+# keystroke or a sent message lands somewhere the user cannot take it back from.
 REQUIRE_APPROVAL = {
     cls.__name__
-    for cls in (UpdateFile, MovePath, DeleteFile, DeleteDir)
+    for cls in (
+        UpdateFile, MovePath, DeleteFile, DeleteDir,
+        ClickBrowserElement, TypeInBrowser, SendWhatsappMessage,
+    )
 }
 
 DENIED = (
@@ -43,11 +53,30 @@ _APPROVAL = asyncio.Lock()
 
 PREVIEWS = {"UpdateFile": preview_update}
 
+# What a gated call is about to do, spelled out for the approval prompt. The rail
+# item above it elides long arguments to keep its line intact, which is fine for a
+# file path and useless for the text of a message being sent on the user's behalf.
+DETAILS = {
+    "SendWhatsappMessage":
+        lambda to, message: f"to {to}{chr(10)}{message}",
+    "ClickBrowserElement": lambda text: f"click: {text}",
+    "TypeInBrowser": lambda text, then_enter=False: (
+        f"type: {text}" + (" (then enter)" if then_enter else "")
+    ),
+}
+
 
 def _preview(tool_name: str, params: dict):
     """The diff a gated tool would produce, for the approval prompt to show. Best effort
     -- a preview that cannot be built must never stop the call being offered."""
-    builder = PREVIEWS.get(tool_name)
+    return _build(PREVIEWS.get(tool_name), params)
+
+
+def _detail(tool_name: str, params: dict):
+    return _build(DETAILS.get(tool_name), params)
+
+
+def _build(builder, params: dict):
     if builder is None:
         return None
 
@@ -75,6 +104,10 @@ async def executor(tool_name: str, params: dict):
             # watching the edits go by is the point of not being asked about them
             if preview:
                 frontend.file_changed(*preview)
+
+            detail = _detail(tool_name, params)
+            if detail:
+                frontend.tool_detail(detail)
 
             decision = (
                 Decision(True) if mode.auto()

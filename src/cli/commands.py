@@ -207,6 +207,19 @@ async def handle(
         ui.notice(t("voice.on" if on else "voice.off"))
         return messages, agent
 
+    if name == "/auto":
+        # shift+tab is the shortcut, but some terminals never deliver BackTab to the
+        # application, and a mode you cannot reach is a mode you do not have
+        from src.core import mode
+        on = mode.toggle_auto()
+        ui.notice(t("auto.on" if on else "auto.off"))
+        return messages, agent
+
+    if name == "/browser":
+        from src.tools.browser.tools import browser_status
+        ui.notice(browser_status())
+        return messages, agent
+
     if name == "/clear":
         dropped = len(messages) - HISTORY_START
         ui.notice(t("cmd.cleared", count=dropped))

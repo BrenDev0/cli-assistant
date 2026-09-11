@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     MCP_VERSION: str = "2025-06-18"
     # optional: a missing key fails on the first web call, not at startup
     TAVILY_API_KEY: str = ""
+    # Optional. Set it and the browser tools attach to a Chrome you already have
+    # open -- your real one, with your sessions -- instead of launching their own.
+    # That Chrome has to have been started with --remote-debugging-port=<this>.
+    CHROME_DEBUG_PORT: str = ""
 
     def has_ghl(self) -> bool:
         return bool(self.GHL_PIT and self.GHL_LOCATION_ID)

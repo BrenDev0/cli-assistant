@@ -52,6 +52,13 @@ def tasks_dir() -> Path:
     return ASSISTANT_HOME / "tasks"
 
 
+def browser_dir() -> Path:
+    """Chrome profile for the browser tools. Its own profile rather than the user's:
+    a logged-in WhatsApp Web session has to survive between runs, and Chrome refuses
+    to open a profile directory that another Chrome already holds."""
+    return ASSISTANT_HOME / "browser"
+
+
 def data_dir() -> Path:
     """Fetched datasets. Global rather than project-local because a dataset is a snapshot
     of the user's CRM, not of the project they happened to be sitting in when they pulled

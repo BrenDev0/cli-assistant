@@ -284,7 +284,9 @@ def feedback_prompt() -> HTML:
 
 
 def tool_name(name: str) -> str:
-    return click.style(f"{name:<{TOOL_COLUMN}}", fg=ACCENT, bold=True)
+    # ljust leaves nothing behind a name longer than the column, which ran the name
+    # straight into its first argument
+    return click.style(f"{name:<{TOOL_COLUMN}} ", fg=ACCENT, bold=True)
 
 
 # "  " + rail glyph + " " from rail_body, plus the two-space indent added below

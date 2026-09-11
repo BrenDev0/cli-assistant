@@ -29,6 +29,9 @@ STRINGS = {
         "ask.MovePath": "move it?",
         "ask.DeleteFile": "delete it?",
         "ask.DeleteDir": "delete it?",
+        "ask.SendWhatsappMessage": "send this message?",
+        "ask.ClickBrowserElement": "click it?",
+        "ask.TypeInBrowser": "type this?",
         "ask.default": "run this?",
         "ask.yes": "yes",
         "ask.no": "no",
@@ -60,6 +63,8 @@ STRINGS = {
             "  /clear     drop the conversation entirely\n"
             "  /model     show or switch the model\n"
             "  /voice     toggle talking to it instead of typing\n"
+            "  /browser   attach to your own Chrome so it can drive your tabs\n"
+            "  /auto      toggle auto mode, for terminals that swallow shift+tab\n"
             "  shift+tab  toggle auto mode — apply edits without asking\n"
             "  exit       leave"
         ),
@@ -95,6 +100,9 @@ STRINGS = {
         "ask.MovePath": "¿moverlo?",
         "ask.DeleteFile": "¿borrarlo?",
         "ask.DeleteDir": "¿borrarlo?",
+        "ask.SendWhatsappMessage": "¿enviar este mensaje?",
+        "ask.ClickBrowserElement": "¿hacer clic?",
+        "ask.TypeInBrowser": "¿escribir esto?",
         "ask.default": "¿ejecutar esto?",
         "ask.yes": "sí",
         "ask.no": "no",
@@ -126,6 +134,8 @@ STRINGS = {
             "  /clear     descartar la conversación entera\n"
             "  /model     ver o cambiar el modelo\n"
             "  /voice     alternar entre hablarle y escribirle\n"
+            "  /browser   conectar con tu Chrome para que use tus pestañas\n"
+            "  /auto      alternar modo auto, si tu terminal se traga shift+tab\n"
             "  shift+tab  alternar modo auto — aplicar cambios sin preguntar\n"
             "  exit       salir"
         ),

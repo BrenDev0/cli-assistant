@@ -142,6 +142,13 @@ class CliFrontend:
 
         ui.file_changed(path, before, after)
 
+    def tool_detail(self, text: str, task_id: str | None) -> None:
+        if task_id:
+            return
+
+        for row in text.split(chr(10)):
+            ui.rail_body(click.style(row, fg='white'))
+
     def task_started(self, task_id: str, description: str) -> None:
         self.tasks[task_id] = {
             "what": description,

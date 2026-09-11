@@ -9,9 +9,9 @@ without relying on a pre-built agent framework.
 ## Overview
 
 THE WAY runs a conversational agent loop directly in the terminal. It
-maintains conversation state across turns, exposes 25 tools the model can call
+maintains conversation state across turns, exposes 35 tools the model can call
 (file system, GoHighLevel CRM, dataset fetching, web search, HTML authoring,
-background tasks, conversation history), and executes those calls through an async
+browser automation, background tasks, conversation history), and executes those calls through an async
 runtime.
 
 Two features shape most of the design:
@@ -241,6 +241,7 @@ typed to turn itself off.
 | GoHighLevel | search, describe and execute any CRM operation over MCP |
 | data | fetch a paged CRM read to disk and profile it |
 | web | search, extract, map, crawl (Tavily) |
+| browser | open page, read page, list/switch tabs, click, type, find/read WhatsApp chat, send WhatsApp message, close |
 | html | build page (report, landing, dashboard, article) |
 | background | start task, check task, deliver task output |
 | skills | build, list |
@@ -308,6 +309,69 @@ typed to turn itself off.
   for the whole session rather than once per turn, so the box stays on screen
   while a turn is worked on, and the approval question is answered in it —
   only one application can hold the terminal at a time.
+- **The browser tools are generic; the WhatsApp one is a shortcut over them** —
+  open, read, list tabs, switch tab, click and type drive any site, which is what
+  makes "log into X and do Y" possible without a tool per site. `SendWhatsappMessage`
+  stays because the generic path to the same result is to type into WhatsApp's
+  contact search and click a row out of a list that reorders as it filters, which
+  risks sending a stranger a message that cannot be recalled — and because it
+  costs one approval instead of five.
+- **A name is resolved before it is messaged, never during** — nobody asks for a
+  message by phone number, they ask by name, so `SendWhatsappMessage` takes
+  either. A number goes through the URL and cannot land on the wrong chat. A name
+  has to be picked out of a list that reorders as it filters, so it is resolved in
+  two steps, the same shape as the CRM tools: `FindWhatsappChat` returns the
+  matching chat names for the user to confirm, and the send then insists on an
+  exact one. A near miss is answered with the candidates rather than a guess, and
+  once a chat is opened it is checked against the name asked for before a single
+  character is typed. A chat actually *named* what was asked for is not a candidate
+  among the others, it is the answer: WhatsApp searches message bodies as well as
+  names, so a person's name comes back with every group that has ever mentioned
+  them, and making the user pick their friend out of that list every time is not a
+  safety measure, it is noise. Looking the number up among the CRM contacts is a
+  good way to get one, but that is reading contact data and says nothing about
+  which channel sends.
+- **The browser and the CRM are different senders, and only one of them is
+  free to start a conversation** — GoHighLevel's WhatsApp runs on the Business
+  API, where a free-form message is only allowed within 24 hours of the contact's
+  own last message and anything outside that window has to be an approved
+  template. The browser is an ordinary WhatsApp client with no such limit, which
+  makes it the route for a first approach or a conversation that has gone cold.
+  The catch is that the message then arrives from whichever number is signed into
+  the browser rather than the CRM's, so the two are not interchangeable and the
+  tool descriptions say so.
+- **It works in the user's own Chrome when it can** — set `CHROME_DEBUG_PORT` and
+  the tools attach to a Chrome already running on that port, with every session
+  the user is signed into, so nothing needs logging into twice. It is opt-in
+  because Chrome only accepts a debugger connection when it was started with
+  `--remote-debugging-port`, which is not how anyone opens a browser by habit.
+  Unset, the tools launch their own visible Chrome on a profile under
+  `~/.the_way/browser/` — its own profile because Chrome will not share a profile
+  directory with another Chrome, and visible because the first sign-in needs a QR
+  code or a password typed and because the user should be able to watch what is
+  done on their behalf. Either way `ListBrowserTabs` comes first: a tab the user
+  already has open and signed in is both faster and the difference between
+  working and being shown a login page.
+- **Acting is gated, looking is not** — opening
+  and reading a page, and listing or switching tabs, are navigation; a click, a
+  keystroke or a sent message reaches outside this machine and cannot be taken
+  back, so those three are gated. They also refuse to run inside a background task outright: approval
+  is skipped when `CURRENT_TASK` is set, and "send this message" is not a thing to
+  do with nobody at the keyboard.
+- **An approval has to show what it is approving** — the rail elides long
+  arguments to keep its line intact, which is right for a file path and useless
+  for the text of a message. A gated tool can supply a detail block, printed
+  under the call before the question, so the number and the message are on screen
+  when yes is typed. `SendWhatsappMessage` takes one number per call for the same
+  reason: a list approved in one keystroke is a mistake that reaches everyone on
+  it, where one call per number stops at the first one.
+- **WhatsApp is driven by its own URL, not its DOM** — a message is sent by
+  loading `send?phone=&text=`, because the alternative is typing into the contact
+  search and clicking a result out of a list the page reorders as it filters.
+  Picking the wrong row there sends a stranger a message that cannot be recalled.
+  The selectors that remain are a fallback chain, since WhatsApp Web ships a new
+  build constantly, and a send that cannot be confirmed in the transcript says so
+  rather than reporting success.
 - **Voice is a pipeline, not a mode switch** — speech goes to
   `gpt-4o-transcribe`, the text enters the loop exactly where typed input does,
   and the reply is spoken back, so the agent, tools and approval gate are
@@ -390,6 +454,8 @@ typed to turn itself off.
 - **sounddevice** (PortAudio) — microphone capture and speaker playback for
   voice mode; OpenAI `gpt-4o-transcribe` and `gpt-4o-mini-tts` do the rest
 - **Pydantic / Pydantic Settings** — tool schemas and environment configuration
+- **Selenium** — drives a real Chrome for tasks that need the user's own
+  logged-in sessions
 - **Tavily** — web search and extraction
 - **MCP** (hand-rolled streamable-HTTP client) — GoHighLevel integration
 - **Click** — CLI entry point and terminal styling

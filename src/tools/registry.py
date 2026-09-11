@@ -20,6 +20,18 @@ from src.tools.ghl.tools import (
 from src.tools.data.tools import fetch_ghl_dataset
 from src.tools.background.tools import start_background_task, check_background_task, deliver_task
 from src.tools.history.tools import search_conversation_history
+from src.tools.browser.tools import (
+    open_browser_page,
+    read_browser_page,
+    click_browser_element,
+    type_in_browser,
+    send_whatsapp_message,
+    find_whatsapp_chat,
+    read_whatsapp_chat,
+    list_browser_tabs,
+    switch_browser_tab,
+    close_browser,
+)
 from src.tools.web.tools import (
     web_search,
     map_web_pages,
@@ -39,6 +51,18 @@ from .data.schemas import FetchGhlDataset
 from .background.schemas import StartBackgroundTask, CheckBackgroundTask, DeliverTask
 from .web.schemas import WebSearch, MapWebPages, ExtractWebPages, CrawlWebPages, WebResearch
 from .history.schemas import SearchConversationHistory
+from .browser.schemas import (
+    OpenBrowserPage,
+    ReadBrowserPage,
+    ClickBrowserElement,
+    TypeInBrowser,
+    SendWhatsappMessage,
+    FindWhatsappChat,
+    ReadWhatsappChat,
+    ListBrowserTabs,
+    SwitchBrowserTab,
+    CloseBrowser,
+)
 
 TOOLS = {
     ReadFile: read_file,
@@ -66,7 +90,17 @@ TOOLS = {
     ExtractWebPages: extract_web_pages,
     CrawlWebPages: crawl_web_pages,
     # WebResearch: web_research,
-    SearchConversationHistory: search_conversation_history
+    SearchConversationHistory: search_conversation_history,
+    OpenBrowserPage: open_browser_page,
+    ReadBrowserPage: read_browser_page,
+    ClickBrowserElement: click_browser_element,
+    TypeInBrowser: type_in_browser,
+    FindWhatsappChat: find_whatsapp_chat,
+    ReadWhatsappChat: read_whatsapp_chat,
+    SendWhatsappMessage: send_whatsapp_message,
+    ListBrowserTabs: list_browser_tabs,
+    SwitchBrowserTab: switch_browser_tab,
+    CloseBrowser: close_browser,
 }
 
 TOOL_REGISTRY = {cls.__name__: fn for cls, fn in TOOLS.items()}
